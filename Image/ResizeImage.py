@@ -1,3 +1,16 @@
+'''
+# ResizeImage.py
+
+## 概要
+- 画像ファイルを指定したスケールでリサイズするツール
+
+## 使い方
+- python ResizeImage.py [files or directories] [options]
+- options:
+  - --s:[scale] : リサイズのスケールを指定（例: --s:0.5 は50%にリサイズ、デフォルトは0.5）
+  - --t:[type] : 出力画像の形式を指定（例: --t:webp、--t:avif、--t:png、デフォルトは元の形式）
+'''
+
 from pathlib import Path
 from PIL import Image
 import os
