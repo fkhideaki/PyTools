@@ -8,6 +8,7 @@
 - python ResizeImage.py [files or directories] [options]
 - options:
   - --s:[scale] : リサイズのスケールを指定（例: --s:0.5 は50%にリサイズ、デフォルトは0.5）
+  - --ns : リサイズしない。（画像形式変更のみ実行）
   - --t:[type] : 出力画像の形式を指定（例: --t:webp、--t:avif、--t:png、デフォルトは元の形式）
 '''
 
@@ -25,28 +26,31 @@ def resizeMain(img, scale):
 def resizeImg(fn, scale, saveType=None):
     print(fn)
     if not os.path.exists(fn):
-        print(f"ファイルが見つかりません: {fn}")
+        print(f"  ファイルが見つかりません: {fn}")
         return
     
     ext = os.path.splitext(fn)[1].lower()
     if ext not in ['.webp', '.avif', '.png']:
-        print(f"サポートされていない形式です: {fn}")
+        print(f"  サポートされていない形式です: {fn}")
         return
 
     img = Image.open(fn)
 
-    resized = resizeMain(img, scale)
+    if scale is not None:
+        outImg = resizeMain(img, scale)
+    else:
+        outImg = img
 
     saveType = saveType if saveType else ext
     base = os.path.splitext(fn)[0]
     outFN = f"{base}_resized{saveType}"
 
     if saveType == '.webp':
-        resized.save(outFN, 'WEBP', quality=85)
+        outImg.save(outFN, 'WEBP', quality=85)
     elif saveType == '.avif':
-        resized.save(outFN, 'AVIF', quality=85)
+        outImg.save(outFN, 'AVIF', quality=85)
     elif saveType == '.png':
-        resized.save(outFN, 'PNG', optimize=True)
+        outImg.save(outFN, 'PNG', optimize=True)
 
 def main():
     options: list[str] = []
@@ -64,6 +68,8 @@ def main():
             scale = float(s.split(':')[1])
         elif s.startswith('--t'):
             outType = '.' + s.split(':')[1]
+        elif s == '--ns':
+            scale = None
 
     for s in files:
         p = Path(s)
