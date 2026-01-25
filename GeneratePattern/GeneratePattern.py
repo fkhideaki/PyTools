@@ -25,9 +25,14 @@ words1 = [
 words2 = [
 ]
 
+def gen_words():
+    for w0 in words0 or ['']:
+        t0 = pattern.replace('$0', w0)
+        for w1 in words1 or ['']:
+            t1 = t0.replace('$1', w1)
+            for w2 in words2 or ['']:
+                t2 = t1.replace('$2', w2)
+                yield t2
 
-for w0 in words0 or ['']:
-    for w1 in words1 or ['']:
-        for w2 in words2 or ['']:
-            result = pattern.replace('$0', w0).replace('$1', w1).replace('$2', w2)
-            print(result)
+for s in gen_words():
+    print(s)
