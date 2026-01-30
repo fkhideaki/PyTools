@@ -5,16 +5,22 @@
 - ギャラリー形式の画像ビューアーを生成する
 
 ## 使用方法
-- python GalleryBuilder.py <フォルダパス>
+- python GalleryBuilder.py <フォルダパス> [options]
+- options:
+  - --swipe
+    - スマホ時にswipeでページ送りする機能を有効にする
 """
 
 import sys
 from pathlib import Path
+from typing import List
 
-def generatePage(folder_path: Path, images: list[str]):
+def generatePage(folder_path: Path, images: list[str], swipe: bool):
     folder_name = folder_path.name
     title = f'{folder_name}'
-    
+
+    enableSwipe = 'true' if swipe else 'false'
+
     html_template = f"""\
 <!DOCTYPE html>
 <html lang="ja">
@@ -295,6 +301,35 @@ def generatePage(folder_path: Path, images: list[str]):
             }}
         }});
 
+        // タッチスワイプイベント
+        let touchStartX = 0;
+        let touchEndX = 0;
+        let enableSwipe = {enableSwipe};
+
+        function handleSwipe() {{
+            if (!enableSwipe) return;
+            if (touchEndX < touchStartX - 50) {{
+                // 右から左へのスワイプ（次の画像）
+                nextImage();
+            }} else if (touchEndX > touchStartX + 50) {{
+                // 左から右へのスワイプ（前の画像）
+                prevImage();
+            }}
+        }}
+        
+        document.addEventListener('touchstart', function(e) {{
+            const modal = document.getElementById('modal');
+            if (!modal.classList.contains('active')) return;
+            touchStartX = e.changedTouches[0].screenX;
+        }});
+        
+        document.addEventListener('touchend', function(e) {{
+            const modal = document.getElementById('modal');
+            if (!modal.classList.contains('active')) return;
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }});
+
         function makeElem(tagType, className, parent)
         {{
             var d = document.createElement(tagType);
@@ -365,7 +400,7 @@ def getImages(folder: Path) -> list[str]:
     
     return images
 
-def buidMain(folder: Path):
+def buidMain(folder: Path, opt: List[str]):
     if not folder.is_dir():
         print(f'{folder} is not folder')
         return
@@ -375,7 +410,8 @@ def buidMain(folder: Path):
         print(f"{folder} に画像ファイルが見つかりませんでした")
         return
 
-    html = generatePage(folder, images)
+    swipe = '--swipe' in opt
+    html = generatePage(folder, images, swipe)
 
     outFN = folder / "gallery.html"
     with open(outFN, 'w', encoding='utf-8') as f:
@@ -384,11 +420,19 @@ def buidMain(folder: Path):
     print(f'create viewer="{outFN}" images={len(images)}')
 
 def main():
-    if len(sys.argv) != 2:
-        print(f"使用方法: python {Path(__file__).name} <フォルダパス>")
-        return
+    dirs: List[Path] = []
+    opt: List[str] = []
+    
+    for s in sys.argv[1:]:
+        if s.startswith('--'):
+            opt.append(s)
+        else:
+            p = Path(s)
+            if p.is_dir():
+                dirs.append(p)
 
-    buidMain(Path(sys.argv[1]))
+    for d in dirs:
+        buidMain(d, opt)
 
 if __name__ == "__main__":
     main()
