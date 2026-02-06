@@ -18,9 +18,7 @@ from pathlib import Path
 from PIL import Image
 
 
-def exec_img(img_path):
-    img = Image.open(img_path).convert("RGBA")
-
+def separate_alpha(img):
     color_img = Image.new("RGBA", img.size)
     alpha_img = Image.new("RGBA", img.size)
 
@@ -35,17 +33,21 @@ def exec_img(img_path):
             color_img.putpixel((x, y), color_pixel)
             alpha_img.putpixel((x, y), alpha_pixel)
 
-    base_stem = Path(img_path).stem
-    color_output_path = f"{base_stem}_c.png"
-    alpha_output_path = f"{base_stem}_a.png"
+    return color_img, alpha_img
 
-    color_img.save(color_output_path)
-    alpha_img.save(alpha_output_path)
+def exec_img(img_path: Path):
+    img = Image.open(img_path).convert("RGBA")
+
+    color_img, alpha_img = separate_alpha(img)
+
+    base = img_path.parent / img_path.stem
+    color_img.save(f"{base}_c.png")
+    alpha_img.save(f"{base}_a.png")
 
 
 def main():
     for img_path in sys.argv[1:]:
-        exec_img(img_path)
+        exec_img(Path(img_path))
 
 if __name__ == "__main__":
     main()
