@@ -24,36 +24,25 @@
 import sys
 from pathlib import Path
 from PIL import Image
+import numpy as np
 
 
-def get_img_color(color_path):
-    '''
-    - 指定画像ファイルの代表色を取得する
-    - 指定される画像ファイルは全ピクセルが同じ色の前提だが  
-      この関数では(0, 0)の色を返す
-    '''
-    img = Image.open(color_path)
-    return img.getpixel((0, 0))
+def make_logo(logo_path: Path, color_path: Path):
+    color_img = Image.open(color_path)
+    logo_img = Image.open(logo_path)
 
-def make_logo(logo_path, color_pixel):
-    logo_img = Image.open(logo_path).convert("RGBA")
+    ary_col = np.array(color_img)
+    ary_a = np.array(logo_img)
 
-    result_img = Image.new("RGBA", logo_img.size)
+    ary_dst = np.zeros_like(ary_a)
+    ary_dst[:, :, :3] = ary_col[0, 0, :3]
+    ary_dst[:, :, 3] = ary_a[:, :, 3]
 
-    cr, cg, cb, _ = color_pixel
-    for x in range(logo_img.width):
-        for y in range(logo_img.height):
-            p = logo_img.getpixel((x, y))
-            a = p[3]
-            result_pixel = (cr, cg, cb, a)
-            result_img.putpixel((x, y), result_pixel)
-
+    result_img = Image.fromarray(ary_dst)
     return result_img
 
 def exec_img(logo_path: Path, color_path: Path):
-    color_pixel = get_img_color(color_path)
-
-    result_img = make_logo(logo_path, color_pixel)
+    result_img = make_logo(logo_path, color_path)
 
     output_path = logo_path.parent / f"{logo_path.stem}_{color_path.stem}.png"
     result_img.save(output_path)
