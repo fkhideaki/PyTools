@@ -21,6 +21,7 @@
 import sys
 from pathlib import Path
 from PIL import Image
+import numpy as np
 
 
 def combine_alpha(img: Image, alphamap: Image):
@@ -28,19 +29,14 @@ def combine_alpha(img: Image, alphamap: Image):
         print(f"Error: Image size {img.size} and Alpha map size {alphamap.size} do not match.")
         return None
 
-    result_img = Image.new("RGBA", img.size)
+    ary_col = np.array(img)
+    ary_a = np.array(alphamap)
 
-    for x in range(img.width):
-        for y in range(img.height):
-            p = img.getpixel((x, y))
-            a_map = alphamap.getpixel((x, y))
-            r, g, b, _ = p
-            a = a_map[0]  # Use red channel of alpha map for alpha value
-
-            result_pixel = (r, g, b, a)
-            result_img.putpixel((x, y), result_pixel)
-
-    return result_img
+    ary_dst = np.zeros_like(ary_col)
+    ary_dst[:, :, :3] = ary_col[:, :, :3]
+    ary_dst[:, :, 3] = ary_a[:, :, 0]
+    img_dst = Image.fromarray(ary_dst)
+    return img_dst
 
 def exec_img(img_path: Path, alphamap_path: Path):
     img = Image.open(img_path).convert("RGBA")
