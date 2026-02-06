@@ -77,8 +77,7 @@ def getDstSize(img: Image, dst_size: SizeCfg):
 def repeat_sampling_resize(img, new_sz, sample):
     arr = np.array(img)
     
-    kernel_size = 4
-    pad_size = kernel_size
+    pad_size = 4
     if arr.ndim == 2:
         padded = np.pad(arr, pad_size, mode='wrap')
         mode = 'L'
@@ -88,25 +87,22 @@ def repeat_sampling_resize(img, new_sz, sample):
     
     padded_img = Image.fromarray(padded.astype(np.uint8), mode=mode)
     
-    old_width, old_height = img.size
-    new_width, new_height = new_sz
+    old_w, old_h = img.size
+    new_w, new_h = new_sz
     
-    scale_x = new_width / old_width
-    scale_y = new_height / old_height
+    scale_x = new_w / old_w
+    scale_y = new_h / old_h
     
-    intermediate_width = int((old_width + 2 * pad_size) * scale_x)
-    intermediate_height = int((old_height + 2 * pad_size) * scale_y)
+    sxw = int((old_w + 2 * pad_size) * scale_x)
+    sxh = int((old_h + 2 * pad_size) * scale_y)
+    intermediate_sz = (sxw, sxh)
+    resized_padded = padded_img.resize(intermediate_sz, sample)
     
-    resized_padded = padded_img.resize((intermediate_width, intermediate_height), sample)
-    
-    crop_left = int(pad_size * scale_x)
-    crop_top = int(pad_size * scale_y)
-    crop_right = crop_left + new_width
-    crop_bottom = crop_top + new_height
-    
-    result = resized_padded.crop((crop_left, crop_top, crop_right, crop_bottom))
-    
-    return result
+    crop_l = int(pad_size * scale_x)
+    crop_t = int(pad_size * scale_y)
+    crop_r = crop_l + new_w
+    crop_b = crop_t + new_h
+    return resized_padded.crop((crop_l, crop_t, crop_r, crop_b))
 
 def separate_alpha(img):
     r, g, b, a = img.split()
