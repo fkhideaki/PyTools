@@ -16,25 +16,32 @@
       - --t:webp
       - --t:avif
       - --t:png
+  - --repeat : リピートリサンプルでリサイズする
 '''
 
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from PIL import Image
-import os
 import sys
 
 
 @dataclass
-class SizeReq:
+class SizeCfg:
     scale: float | None = None
     width: int | None = None
     height: int | None = None
     max_len: int | None = None
 
 
-def getDstSize(img, dst_size):
+@dataclass
+class Cfg:
+    repeat: bool = False
+    out_type: str | None = None
+    size_cfg: SizeCfg = field(default_factory=SizeCfg)
+
+
+def getDstSize(img: Image, dst_size: SizeCfg):
     scale = dst_size.scale
     width = dst_size.width
     height = dst_size.height
@@ -63,30 +70,30 @@ def getDstSize(img, dst_size):
         return (newW, newH)
     return None
 
-def resizeMain(img: Image, dst_size: SizeReq):
+def resizeMain(img: Image, cfg: Cfg):
     resample = Image.Resampling.BILINEAR
-    newSz = getDstSize(img, dst_size)
+    newSz = getDstSize(img, cfg.size_cfg)
     if newSz:
         return img.resize(newSz, resample)
     else:
         return img
 
-def resizeImg(fp: Path, dst_size: SizeReq, saveType):
+def resizeImg(fp: Path, cfg: Cfg):
     print(fp)
-    if not os.path.exists(fp):
+    if not fp.is_file():
         print(f"  ファイルが見つかりません: {fp}")
         return
     
-    ext = os.path.splitext(fp)[1].lower()
+    ext = fp.suffix.lower()
     if ext not in ['.webp', '.avif', '.png']:
         print(f"  サポートされていない形式です: {fp}")
         return
 
     img = Image.open(fp)
-    outImg = resizeMain(img, dst_size)
+    outImg = resizeMain(img, cfg)
 
-    saveType = saveType if saveType else ext
-    base = os.path.splitext(fp)[0]
+    saveType = cfg.out_type if cfg.out_type else ext
+    base = fp.parent / fp.stem
     outFN = f"{base}_resized{saveType}"
 
     if saveType == '.webp':
@@ -96,10 +103,10 @@ def resizeImg(fp: Path, dst_size: SizeReq, saveType):
     elif saveType == '.png':
         outImg.save(outFN, 'PNG', optimize=True)
 
-def resizeImgInDir(dir_path: Path, dst_size: SizeReq, outType):
+def resizeImgInDir(dir_path: Path, cfg: Cfg):
     for f in dir_path.iterdir():
         if f.is_file():
-            resizeImg(f, dst_size, outType)
+            resizeImg(f, cfg)
 
 def main():
     options: list[str] = []
@@ -110,26 +117,26 @@ def main():
         else:
             files.append(s)
 
-    dst_size = SizeReq()
-    outType = None
+    cfg = Cfg()
+    size_cfg = cfg.size_cfg
     for s in options:
         if s.startswith('--s'):
-            dst_size.scale = float(s.split(':')[1])
+            size_cfg.scale = float(s.split(':')[1])
         elif s.startswith('--w'):
-            dst_size.width = int(s.split(':')[1])
+            size_cfg.width = int(s.split(':')[1])
         elif s.startswith('--h'):
-            dst_size.height = int(s.split(':')[1])
+            size_cfg.height = int(s.split(':')[1])
         elif s.startswith('--b'):
-            dst_size.max_len = int(s.split(':')[1])
+            size_cfg.max_len = int(s.split(':')[1])
         elif s.startswith('--t'):
-            outType = '.' + s.split(':')[1]
+            cfg.outType = '.' + s.split(':')[1]
 
     for s in files:
         p = Path(s)
         if p.is_dir():
-            resizeImgInDir(p, dst_size, outType)
+            resizeImgInDir(p, cfg)
         elif p.is_file():
-            resizeImg(s, dst_size, outType)
+            resizeImg(p, cfg)
 
 if __name__ == "__main__":
     main()
