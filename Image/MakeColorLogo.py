@@ -40,7 +40,7 @@ def make_logo(logo_path, color_pixel):
 
     result_img = Image.new("RGBA", logo_img.size)
 
-    cr, cg, cb = color_pixel
+    cr, cg, cb, _ = color_pixel
     for x in range(logo_img.width):
         for y in range(logo_img.height):
             p = logo_img.getpixel((x, y))
