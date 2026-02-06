@@ -23,7 +23,7 @@ from pathlib import Path
 from PIL import Image
 
 
-def exec_img(img_path, alphamap_path):
+def exec_img(img_path: Path, alphamap_path: Path):
     img = Image.open(img_path).convert("RGBA")
     alphamap = Image.open(alphamap_path).convert("RGBA")
 
@@ -43,7 +43,7 @@ def exec_img(img_path, alphamap_path):
             result_pixel = (r, g, b, a)
             result_img.putpixel((x, y), result_pixel)
 
-    base_stem = Path(img_path).stem
+    base_stem = img_path.parent / img_path.stem
     output_path = f"{base_stem}_out.png"
     result_img.save(output_path)
     print(f"Saved {output_path}")
@@ -53,8 +53,8 @@ def main():
         print("Usage: python AlphaSeparate.py [image] [alpha_map]")
         return
 
-    img_path = sys.argv[1]
-    alphamap_path = sys.argv[2]
+    img_path = Path(sys.argv[1])
+    alphamap_path = Path(sys.argv[2])
 
     exec_img(img_path, alphamap_path)
 

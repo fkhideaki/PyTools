@@ -44,8 +44,9 @@ def exec_img(img_path: Path):
 
 
 def main():
-    for img_path in sys.argv[1:]:
-        exec_img(Path(img_path))
+    for a in sys.argv[1:]:
+        img_path = Path(a)
+        exec_img(img_path)
 
 if __name__ == "__main__":
     main()
