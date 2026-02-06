@@ -23,13 +23,10 @@ from pathlib import Path
 from PIL import Image
 
 
-def exec_img(img_path: Path, alphamap_path: Path):
-    img = Image.open(img_path).convert("RGBA")
-    alphamap = Image.open(alphamap_path).convert("RGBA")
-
+def combine_alpha(img: Image, alphamap: Image):
     if img.size != alphamap.size:
         print(f"Error: Image size {img.size} and Alpha map size {alphamap.size} do not match.")
-        return
+        return None
 
     result_img = Image.new("RGBA", img.size)
 
@@ -43,10 +40,19 @@ def exec_img(img_path: Path, alphamap_path: Path):
             result_pixel = (r, g, b, a)
             result_img.putpixel((x, y), result_pixel)
 
+    return result_img
+
+def exec_img(img_path: Path, alphamap_path: Path):
+    img = Image.open(img_path).convert("RGBA")
+    alphamap = Image.open(alphamap_path).convert("RGBA")
+
+    result_img = combine_alpha(img, alphamap)
+    if not result_img:
+        return
+
     base_stem = img_path.parent / img_path.stem
     output_path = f"{base_stem}_out.png"
     result_img.save(output_path)
-    print(f"Saved {output_path}")
 
 def main():
     if len(sys.argv) != 3:

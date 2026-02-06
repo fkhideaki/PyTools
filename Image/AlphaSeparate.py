@@ -19,7 +19,7 @@ from PIL import Image
 import numpy as np
 
 
-def separate_alpha(img):
+def separate_alpha(img: Image):
     arr = np.array(img)
     
     color_arr = arr.copy()
