@@ -34,8 +34,7 @@ class SizeReq:
     max_len: int | None = None
 
 
-def resizeMain(img: Image, dst_size: SizeReq):
-    resample = Image.Resampling.BILINEAR
+def getDstSize(img, dst_size):
     scale = dst_size.scale
     width = dst_size.width
     height = dst_size.height
@@ -45,15 +44,15 @@ def resizeMain(img: Image, dst_size: SizeReq):
     if scale is not None:
         newW = int(orgW * scale)
         newH = int(orgH * scale)
-        return img.resize((newW, newH), resample)
+        return (newW, newH)
     elif width is not None:
         newW = width
         newH = int(width * orgH / orgW)
-        return img.resize((newW, newH), resample)
+        return (newW, newH)
     elif height is not None:
         newH = height
         newW = int(height * orgW / orgH)
-        return img.resize((newW, newH), resample)
+        return (newW, newH)
     elif max_len is not None:
         if orgW >= orgH:
             newW = max_len
@@ -61,8 +60,16 @@ def resizeMain(img: Image, dst_size: SizeReq):
         else:
             newH = max_len
             newW = int(max_len * orgW / orgH)
-        return img.resize((newW, newH), resample)
-    return img
+        return (newW, newH)
+    return None
+
+def resizeMain(img: Image, dst_size: SizeReq):
+    resample = Image.Resampling.BILINEAR
+    newSz = getDstSize(img, dst_size)
+    if newSz:
+        return img.resize(newSz, resample)
+    else:
+        return img
 
 def resizeImg(fp: Path, dst_size: SizeReq, saveType):
     print(fp)
