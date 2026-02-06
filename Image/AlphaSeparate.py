@@ -16,22 +16,20 @@
 import sys
 from pathlib import Path
 from PIL import Image
+import numpy as np
 
 
 def separate_alpha(img):
-    color_img = Image.new("RGBA", img.size)
-    alpha_img = Image.new("RGBA", img.size)
-
-    for x in range(img.width):
-        for y in range(img.height):
-            p = img.getpixel((x, y))
-            r, g, b, a = p
-
-            color_pixel = (r, g, b, 255)
-            alpha_pixel = (a, a, a, 255)
-
-            color_img.putpixel((x, y), color_pixel)
-            alpha_img.putpixel((x, y), alpha_pixel)
+    arr = np.array(img)
+    
+    color_arr = arr.copy()
+    color_arr[:, :, 3] = 255
+    color_img = Image.fromarray(color_arr)
+    
+    alpha_arr = np.zeros_like(arr)
+    alpha_arr[:, :, :3] = arr[:, :, 3:4]
+    alpha_arr[:, :, 3] = 255
+    alpha_img = Image.fromarray(alpha_arr)
 
     return color_img, alpha_img
 
