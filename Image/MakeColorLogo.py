@@ -50,12 +50,12 @@ def make_logo(logo_path, color_pixel):
 
     return result_img
 
-def exec_img(logo_path, color_path):
+def exec_img(logo_path: Path, color_path: Path):
     color_pixel = get_img_color(color_path)
 
     result_img = make_logo(logo_path, color_pixel)
 
-    output_path = f"{Path(logo_path).stem}_{Path(color_path).stem}.png"
+    output_path = logo_path.parent / f"{logo_path.stem}_{color_path.stem}.png"
     result_img.save(output_path)
     print(f"Saved {output_path}")
 
@@ -64,8 +64,8 @@ def main():
         print("Usage: python MakeColorLogo.py [logo_image] [color_image]")
         return
 
-    logo_path = sys.argv[1]
-    color_path = sys.argv[2]
+    logo_path = Path(sys.argv[1])
+    color_path = Path(sys.argv[2])
     exec_img(logo_path, color_path)
 
 if __name__ == "__main__":
