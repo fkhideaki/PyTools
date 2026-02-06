@@ -17,6 +17,7 @@
       - --t:avif
       - --t:png
   - --repeat : リピートリサンプルでリサイズする
+  - --separate : カラーとアルファを個別にリサンプルして透過部のカラー値を維持する
 '''
 
 
@@ -37,8 +38,10 @@ class SizeCfg:
 @dataclass
 class Cfg:
     repeat: bool = False
+    separate_rgb: bool = False
     out_type: str | None = None
     size_cfg: SizeCfg = field(default_factory=SizeCfg)
+    resample = Image.Resampling.BILINEAR
 
 
 def getDstSize(img: Image, dst_size: SizeCfg):
@@ -70,15 +73,30 @@ def getDstSize(img: Image, dst_size: SizeCfg):
         return (newW, newH)
     return None
 
-def resizeMain(img: Image, cfg: Cfg):
-    resample = Image.Resampling.BILINEAR
-    newSz = getDstSize(img, cfg.size_cfg)
-    if newSz:
-        return img.resize(newSz, resample)
-    else:
+def resize_rgba_separately(img, new_sz, sample):
+    if img.mode != 'RGBA':
+        return img.resize(new_sz, sample)
+    
+    r, g, b, a = img.split()
+    
+    rgb = Image.merge("RGB", (r, g, b))
+    resized_c = rgb.resize(new_sz, sample)
+    resized_a = a.resize(new_sz, sample)
+    
+    rr, rg, rb = resized_c.split()
+    return Image.merge("RGBA", (rr, rg, rb, resized_a))
+
+def resize_main(img: Image, cfg: Cfg):
+    new_sz = getDstSize(img, cfg.size_cfg)
+    if not new_sz:
         return img
 
-def resizeImg(fp: Path, cfg: Cfg):
+    if cfg.separate_rgb:
+        return resize_rgba_separately(img, new_sz, cfg.resample)
+    else:
+        return img.resize(new_sz, cfg.resample)
+
+def proc_img(fp: Path, cfg: Cfg):
     print(fp)
     if not fp.is_file():
         print(f"  ファイルが見つかりません: {fp}")
@@ -90,23 +108,23 @@ def resizeImg(fp: Path, cfg: Cfg):
         return
 
     img = Image.open(fp)
-    outImg = resizeMain(img, cfg)
+    outImg = resize_main(img, cfg)
 
-    saveType = cfg.out_type if cfg.out_type else ext
+    save_type = cfg.out_type if cfg.out_type else ext
     base = fp.parent / fp.stem
-    outFN = f"{base}_resized{saveType}"
+    outFN = f"{base}_resized{save_type}"
 
-    if saveType == '.webp':
+    if save_type == '.webp':
         outImg.save(outFN, 'WEBP', quality=85)
-    elif saveType == '.avif':
+    elif save_type == '.avif':
         outImg.save(outFN, 'AVIF', quality=85)
-    elif saveType == '.png':
+    elif save_type == '.png':
         outImg.save(outFN, 'PNG', optimize=True)
 
-def resizeImgInDir(dir_path: Path, cfg: Cfg):
+def proc_dir(dir_path: Path, cfg: Cfg):
     for f in dir_path.iterdir():
         if f.is_file():
-            resizeImg(f, cfg)
+            proc_img(f, cfg)
 
 def main():
     options: list[str] = []
@@ -120,23 +138,27 @@ def main():
     cfg = Cfg()
     size_cfg = cfg.size_cfg
     for s in options:
-        if s.startswith('--s'):
+        if s.startswith('--s:'):
             size_cfg.scale = float(s.split(':')[1])
-        elif s.startswith('--w'):
+        elif s.startswith('--w:'):
             size_cfg.width = int(s.split(':')[1])
-        elif s.startswith('--h'):
+        elif s.startswith('--h:'):
             size_cfg.height = int(s.split(':')[1])
-        elif s.startswith('--b'):
+        elif s.startswith('--b:'):
             size_cfg.max_len = int(s.split(':')[1])
-        elif s.startswith('--t'):
+        elif s.startswith('--t:'):
             cfg.outType = '.' + s.split(':')[1]
+        elif s == '--repeat':
+            cfg.repeat = True
+        elif s == '--separate':
+            cfg.separate_rgb = True
 
     for s in files:
         p = Path(s)
         if p.is_dir():
-            resizeImgInDir(p, cfg)
+            proc_dir(p, cfg)
         elif p.is_file():
-            resizeImg(p, cfg)
+            proc_img(p, cfg)
 
 if __name__ == "__main__":
     main()
