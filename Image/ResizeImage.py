@@ -21,10 +21,11 @@
 '''
 
 
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from PIL import Image
-import sys
+import numpy as np
 
 
 @dataclass
@@ -73,28 +74,65 @@ def getDstSize(img: Image, dst_size: SizeCfg):
         return (newW, newH)
     return None
 
-def resize_rgba_separately(img, new_sz, sample):
-    if img.mode != 'RGBA':
-        return img.resize(new_sz, sample)
+def repeat_sampling_resize(img, new_sz, sample):
+    arr = np.array(img)
     
+    kernel_size = 4
+    pad_size = kernel_size
+    if arr.ndim == 2:
+        padded = np.pad(arr, pad_size, mode='wrap')
+        mode = 'L'
+    else:
+        padded = np.pad(arr, ((pad_size, pad_size), (pad_size, pad_size), (0, 0)), mode='wrap')
+        mode = img.mode
+    
+    padded_img = Image.fromarray(padded.astype(np.uint8), mode=mode)
+    
+    old_width, old_height = img.size
+    new_width, new_height = new_sz
+    
+    scale_x = new_width / old_width
+    scale_y = new_height / old_height
+    
+    intermediate_width = int((old_width + 2 * pad_size) * scale_x)
+    intermediate_height = int((old_height + 2 * pad_size) * scale_y)
+    
+    resized_padded = padded_img.resize((intermediate_width, intermediate_height), sample)
+    
+    crop_left = int(pad_size * scale_x)
+    crop_top = int(pad_size * scale_y)
+    crop_right = crop_left + new_width
+    crop_bottom = crop_top + new_height
+    
+    result = resized_padded.crop((crop_left, crop_top, crop_right, crop_bottom))
+    
+    return result
+
+def separate_alpha(img):
     r, g, b, a = img.split()
-    
     rgb = Image.merge("RGB", (r, g, b))
-    resized_c = rgb.resize(new_sz, sample)
-    resized_a = a.resize(new_sz, sample)
-    
-    rr, rg, rb = resized_c.split()
-    return Image.merge("RGBA", (rr, rg, rb, resized_a))
+    return rgb, a
+
+def resize_buf(buf, cfg: Cfg, new_sz):
+    if cfg.repeat:
+        return repeat_sampling_resize(buf, new_sz, cfg.resample)
+    else:
+        return buf.resize(new_sz, cfg.resample)
 
 def resize_main(img: Image, cfg: Cfg):
     new_sz = getDstSize(img, cfg.size_cfg)
     if not new_sz:
         return img
 
-    if cfg.separate_rgb:
-        return resize_rgba_separately(img, new_sz, cfg.resample)
+    if cfg.separate_rgb and img.mode == 'RGBA':
+        buf_c, buf_a = separate_alpha(img)
+        resized_c = resize_buf(buf_c, cfg, new_sz)
+        resized_a = resize_buf(buf_a, cfg, new_sz)
+
+        rr, rg, rb = resized_c.split()
+        return Image.merge("RGBA", (rr, rg, rb, resized_a))
     else:
-        return img.resize(new_sz, cfg.resample)
+        return resize_buf(img, cfg, new_sz)
 
 def proc_img(fp: Path, cfg: Cfg):
     print(fp)
