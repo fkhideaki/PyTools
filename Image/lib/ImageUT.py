@@ -7,6 +7,8 @@ from scipy import ndimage
 
 
 class Alphamap:
+    '''アルファマップ関連機能'''
+
     @classmethod
     def separate(cls, img: Image):
         arr = np.array(img)
@@ -46,6 +48,8 @@ class AlphaExpandCfg:
 
 
 class AlphaExpand:
+    '''アルファチャンネル膨張と色拡張のユーティリティ'''
+
     @classmethod
     def _expand(cls, img: Image, cfg: AlphaExpandCfg):
         t = img
@@ -161,6 +165,8 @@ class ResizeCfg:
 
 
 class ImageResizeExt:
+    '''画像リサイズの拡張ユーティリティ'''
+
     @classmethod
     def resize(cls, img: Image, cfg: ResizeCfg):
         new_sz = cfg.target_size.get_dst_size(img)
@@ -223,6 +229,8 @@ class ImageResizeExt:
 
 
 class FilesOperator:
+    '''ファイルまたはディレクトリのリストを受け取り、ファイルを反復処理するユーティリティ''''
+
     def __init__(self, path_list: list[Path]):
         self.path_list = path_list
 
