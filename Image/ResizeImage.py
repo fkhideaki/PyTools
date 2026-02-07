@@ -25,110 +25,15 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from PIL import Image
-import numpy as np
 
-
-@dataclass
-class SizeCfg:
-    scale: float | None = None
-    width: int | None = None
-    height: int | None = None
-    max_len: int | None = None
+from lib.ImageUT import FilesOperator, ImageResizeExt, ResizeCfg
 
 
 @dataclass
 class Cfg:
-    repeat: bool = False
-    separate_rgb: bool = False
+    resize_cfg: ResizeCfg = field(default_factory=ResizeCfg)
     out_type: str | None = None
-    size_cfg: SizeCfg = field(default_factory=SizeCfg)
-    resample = Image.Resampling.BILINEAR
 
-
-def getDstSize(img: Image, dst_size: SizeCfg):
-    scale = dst_size.scale
-    width = dst_size.width
-    height = dst_size.height
-    max_len = dst_size.max_len
-
-    orgW, orgH = img.size
-    if scale is not None:
-        newW = int(orgW * scale)
-        newH = int(orgH * scale)
-        return (newW, newH)
-    elif width is not None:
-        newW = width
-        newH = int(width * orgH / orgW)
-        return (newW, newH)
-    elif height is not None:
-        newH = height
-        newW = int(height * orgW / orgH)
-        return (newW, newH)
-    elif max_len is not None:
-        if orgW >= orgH:
-            newW = max_len
-            newH = int(max_len * orgH / orgW)
-        else:
-            newH = max_len
-            newW = int(max_len * orgW / orgH)
-        return (newW, newH)
-    return None
-
-def repeat_sampling_resize(img, new_sz, sample):
-    arr = np.array(img)
-    
-    pad_size = 4
-    if arr.ndim == 2:
-        padded = np.pad(arr, pad_size, mode='wrap')
-        mode = 'L'
-    else:
-        padded = np.pad(arr, ((pad_size, pad_size), (pad_size, pad_size), (0, 0)), mode='wrap')
-        mode = img.mode
-    
-    padded_img = Image.fromarray(padded.astype(np.uint8), mode=mode)
-    
-    old_w, old_h = img.size
-    new_w, new_h = new_sz
-    
-    scale_x = new_w / old_w
-    scale_y = new_h / old_h
-    
-    sxw = int((old_w + 2 * pad_size) * scale_x)
-    sxh = int((old_h + 2 * pad_size) * scale_y)
-    intermediate_sz = (sxw, sxh)
-    resized_padded = padded_img.resize(intermediate_sz, sample)
-    
-    crop_l = int(pad_size * scale_x)
-    crop_t = int(pad_size * scale_y)
-    crop_r = crop_l + new_w
-    crop_b = crop_t + new_h
-    return resized_padded.crop((crop_l, crop_t, crop_r, crop_b))
-
-def separate_alpha(img):
-    r, g, b, a = img.split()
-    rgb = Image.merge("RGB", (r, g, b))
-    return rgb, a
-
-def resize_buf(buf, cfg: Cfg, new_sz):
-    if cfg.repeat:
-        return repeat_sampling_resize(buf, new_sz, cfg.resample)
-    else:
-        return buf.resize(new_sz, cfg.resample)
-
-def resize_main(img: Image, cfg: Cfg):
-    new_sz = getDstSize(img, cfg.size_cfg)
-    if not new_sz:
-        return img
-
-    if cfg.separate_rgb and img.mode == 'RGBA':
-        buf_c, buf_a = separate_alpha(img)
-        resized_c = resize_buf(buf_c, cfg, new_sz)
-        resized_a = resize_buf(buf_a, cfg, new_sz)
-
-        rr, rg, rb = resized_c.split()
-        return Image.merge("RGBA", (rr, rg, rb, resized_a))
-    else:
-        return resize_buf(img, cfg, new_sz)
 
 def proc_img(fp: Path, cfg: Cfg):
     print(fp)
@@ -142,7 +47,7 @@ def proc_img(fp: Path, cfg: Cfg):
         return
 
     img = Image.open(fp)
-    outImg = resize_main(img, cfg)
+    outImg = ImageResizeExt.resize(img, cfg.resize_cfg)
 
     save_type = cfg.out_type if cfg.out_type else ext
     base = fp.parent / fp.stem
@@ -155,11 +60,6 @@ def proc_img(fp: Path, cfg: Cfg):
     elif save_type == '.png':
         outImg.save(outFN, 'PNG', optimize=True)
 
-def proc_dir(dir_path: Path, cfg: Cfg):
-    for f in dir_path.iterdir():
-        if f.is_file():
-            proc_img(f, cfg)
-
 def main():
     options: list[str] = []
     files: list[str] = []
@@ -170,29 +70,28 @@ def main():
             files.append(s)
 
     cfg = Cfg()
-    size_cfg = cfg.size_cfg
+    resize_cfg = cfg.resize_cfg
+    target_size = resize_cfg.target_size
     for s in options:
         if s.startswith('--s:'):
-            size_cfg.scale = float(s.split(':')[1])
+            target_size.scale = float(s.split(':')[1])
         elif s.startswith('--w:'):
-            size_cfg.width = int(s.split(':')[1])
+            target_size.width = int(s.split(':')[1])
         elif s.startswith('--h:'):
-            size_cfg.height = int(s.split(':')[1])
+            target_size.height = int(s.split(':')[1])
         elif s.startswith('--b:'):
-            size_cfg.max_len = int(s.split(':')[1])
+            target_size.max_len = int(s.split(':')[1])
         elif s.startswith('--t:'):
             cfg.outType = '.' + s.split(':')[1]
         elif s == '--repeat':
-            cfg.repeat = True
+            resize_cfg.repeat = True
         elif s == '--separate':
-            cfg.separate_rgb = True
+            resize_cfg.separate_rgb = True
 
-    for s in files:
+    op = FilesOperator.from_strs(files)
+    for s in op.iterate():
         p = Path(s)
-        if p.is_dir():
-            proc_dir(p, cfg)
-        elif p.is_file():
-            proc_img(p, cfg)
+        proc_img(p, cfg)
 
 if __name__ == "__main__":
     main()

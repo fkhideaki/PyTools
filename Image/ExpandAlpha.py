@@ -15,10 +15,9 @@
 
 
 import sys
-from pathlib import Path
 from PIL import Image
 
-from lib.ImageUT import AlphaExpand, AlphaExpandCfg
+from lib.ImageUT import AlphaExpand, AlphaExpandCfg, FilesOperator
 
 
 def exec_img(fp, cfg: AlphaExpandCfg):
@@ -53,10 +52,9 @@ def main():
         elif s == '--saveTmp':
             cfg.save_tmp = True
 
-    for s in files:
-        p = Path(s)
-        if p.is_file():
-            exec_img(p, cfg)
+    op = FilesOperator.from_strs(files)
+    for s in op.iterate():
+        exec_img(p, cfg)
 
 if __name__ == "__main__":
     main()
