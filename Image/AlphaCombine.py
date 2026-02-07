@@ -24,7 +24,7 @@ from PIL import Image
 import numpy as np
 
 
-def combine_alpha(img: Image, alphamap: Image):
+def combine_alphamap(img: Image, alphamap: Image):
     if img.size != alphamap.size:
         print(f"Error: Image size {img.size} and Alpha map size {alphamap.size} do not match.")
         return None
@@ -42,7 +42,7 @@ def exec_img(img_path: Path, alphamap_path: Path):
     img = Image.open(img_path).convert("RGBA")
     alphamap = Image.open(alphamap_path).convert("RGBA")
 
-    result_img = combine_alpha(img, alphamap)
+    result_img = combine_alphamap(img, alphamap)
     if not result_img:
         return
 

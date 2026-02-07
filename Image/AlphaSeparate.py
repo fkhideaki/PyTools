@@ -19,7 +19,7 @@ from PIL import Image
 import numpy as np
 
 
-def separate_alpha(img: Image):
+def separate_alphamap(img: Image):
     arr = np.array(img)
     
     color_arr = arr.copy()
@@ -36,7 +36,7 @@ def separate_alpha(img: Image):
 def exec_img(img_path: Path):
     img = Image.open(img_path).convert("RGBA")
 
-    color_img, alpha_img = separate_alpha(img)
+    color_img, alpha_img = separate_alphamap(img)
 
     base = img_path.parent / img_path.stem
     color_img.save(f"{base}_c.png")
