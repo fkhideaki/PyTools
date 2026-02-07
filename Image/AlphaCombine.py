@@ -21,28 +21,15 @@
 import sys
 from pathlib import Path
 from PIL import Image
-import numpy as np
 
+from lib.ImageUT import Alphamap
 
-def combine_alphamap(img: Image, alphamap: Image):
-    if img.size != alphamap.size:
-        print(f"Error: Image size {img.size} and Alpha map size {alphamap.size} do not match.")
-        return None
-
-    ary_col = np.array(img)
-    ary_a = np.array(alphamap)
-
-    ary_dst = np.zeros_like(ary_col)
-    ary_dst[:, :, :3] = ary_col[:, :, :3]
-    ary_dst[:, :, 3] = ary_a[:, :, 0]
-    img_dst = Image.fromarray(ary_dst)
-    return img_dst
 
 def exec_img(img_path: Path, alphamap_path: Path):
     img = Image.open(img_path).convert("RGBA")
     alphamap = Image.open(alphamap_path).convert("RGBA")
 
-    result_img = combine_alphamap(img, alphamap)
+    result_img = Alphamap.combine(img, alphamap)
     if not result_img:
         return
 

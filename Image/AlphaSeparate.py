@@ -16,27 +16,14 @@
 import sys
 from pathlib import Path
 from PIL import Image
-import numpy as np
 
+from lib.ImageUT import Alphamap
 
-def separate_alphamap(img: Image):
-    arr = np.array(img)
-    
-    color_arr = arr.copy()
-    color_arr[:, :, 3] = 255
-    color_img = Image.fromarray(color_arr)
-    
-    alpha_arr = np.zeros_like(arr)
-    alpha_arr[:, :, :3] = arr[:, :, 3:4]
-    alpha_arr[:, :, 3] = 255
-    alpha_img = Image.fromarray(alpha_arr)
-
-    return color_img, alpha_img
 
 def exec_img(img_path: Path):
     img = Image.open(img_path).convert("RGBA")
 
-    color_img, alpha_img = separate_alphamap(img)
+    color_img, alpha_img = Alphamap.separate(img)
 
     base = img_path.parent / img_path.stem
     color_img.save(f"{base}_c.png")
