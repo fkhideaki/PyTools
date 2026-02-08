@@ -11,6 +11,7 @@
     - 完了時に待機する
   - --cd : 
     - カレントディレクトリをファイルの親フォルダに移動してファイル名でコマンドを起動
+    - 未指定時は対象ファイルをフルパスで指定する
   - --self : 
     - 自分自身のbatを作成する
   - --cmd_full : 
@@ -18,23 +19,18 @@
     - 未指定時にはpython launcherを使う
 '''
 
-import os
+from pathlib import Path
 import sys
 
-def contents(py: str, py_cmd: str, options: list[str]):
+def contents(py: Path, py_cmd: str, options: list[str]):
     if '--cd' in options:
-        cdPath = os.path.dirname(py)
-        pyName = os.path.basename(py)
-        yield f'cd "{cdPath}" %*'
-        yield f'call "{py_cmd}" "{pyName}" %*'
+        yield f'cd "{py.parent}"'
+        yield f'call "{py_cmd}" "{py.name}" %*'
     else:
-        yield f'call "{py_cmd}" "{py}" %*'
-    if '--pause' in options:
-        yield 'pause'
+        yield f'call "{py_cmd}" "{py.resolve()}" %*'
 
-def make_bat(py: str, py_cmd: str, options: list[str]):
-    ext = os.path.splitext(py)[-1]
-    bn = py[0:-len(ext)] + '.bat'
+def make_bat(py: Path, py_cmd: str, options: list[str]):
+    bn = py.parent / (py.stem + '.bat')
     with open(bn, mode='w') as f:
         for s in contents(py, py_cmd, options):
             f.write(s + '\n')
@@ -50,13 +46,15 @@ def main():
 
     py_cmd = 'py'
     if '--self' in options:
-        my_file = os.path.abspath(__file__)
-        files = [my_file]
+        files = [__file__]
     elif '--cmd_full' in options:
         py_cmd = sys.executable
 
     for a in files:
-        make_bat(a, py_cmd, options)
+        make_bat(Path(a), py_cmd, options)
+
+    if '--pause' in options:
+        yield 'pause'
 
 if __name__ == "__main__":
     main()
