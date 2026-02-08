@@ -7,16 +7,18 @@
 ## コマンド
 - python _MakeBat.py [files] [options]
 - options:
-  - --pause : 
+  - --pause
     - 完了時に待機するバッチファイルを出力する
-  - --cd : 
+  - --cd
     - カレントディレクトリをファイルの親フォルダに移動してファイル名でコマンドを起動
     - 未指定時は対象ファイルをフルパスで指定する
-  - --self : 
+  - --self
     - 自分自身のbatを作成する
-  - --cmd_full : 
+  - --cmd_full
     - pythonの実行コマンドに現在のpythonのフルパスを指定
     - 未指定時にはpython launcherを使う
+  - --arg_files
+    - 1つ目の引数を対象のpythonファイルとし、2つ目以降をその引数としてbatを作成する
 '''
 
 from dataclasses import dataclass
@@ -28,13 +30,15 @@ class Cfg:
     py_cmd: str = ''
     cd: bool = False
     pause: bool = False
+    arg_files: bool = False
 
-def make_bat(py: Path, cfg: Cfg):
+def make_bat(py: Path, cfg: Cfg, arg_files: list[str]):
+    arg = ' '.join([f'"{s}"' for s in arg_files])
     if cfg.cd:
         yield f'cd "{py.parent}"'
-        yield f'call "{cfg.py_cmd}" "{py.name}" %*'
+        yield f'call "{cfg.py_cmd}" "{py.name}" {arg} %*'
     else:
-        yield f'call "{cfg.py_cmd}" "{py.resolve()}" %*'
+        yield f'call "{cfg.py_cmd}" "{py.resolve()}" {arg} %*'
     if cfg.pause:
         yield 'pause'
 
@@ -58,13 +62,24 @@ def main():
             cfg.py_cmd = sys.executable
         elif s == '--pause':
             cfg.pause = True
+        elif s == '--arg_files':
+            cfg.arg_files = True
 
-    for a in files:
-        py = Path(a)
+    if cfg.arg_files:
+        if not files:
+            return
+        py = Path(files[0])
         bn = py.parent / (py.stem + '.bat')
         with open(bn, mode='w') as f:
-            for s in make_bat(py, cfg):
+            for s in make_bat(py, cfg, files[1:]):
                 f.write(s + '\n')
+    else:
+        for a in files:
+            py = Path(a)
+            bn = py.parent / (py.stem + '.bat')
+            with open(bn, mode='w') as f:
+                for s in make_bat(py, cfg, []):
+                    f.write(s + '\n')
 
 if __name__ == "__main__":
     main()
