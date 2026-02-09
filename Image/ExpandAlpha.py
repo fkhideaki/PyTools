@@ -24,7 +24,7 @@ def exec_img(fp, cfg: AlphaExpandCfg):
     src = Image.open(fp).convert('RGBA')
     _, _, _, am = src.split()
     
-    ext = AlphaExpand._expand(src, cfg)
+    ext = AlphaExpand.expand(src, cfg)
     rr, rg, rb, _ = ext.split()
     dst = Image.merge("RGBA", (rr, rg, rb, am))
     dst.save(fp.parent / (fp.stem + "_expand.png"))
@@ -54,7 +54,7 @@ def main():
 
     op = FilesOperator.from_strs(files)
     for s in op.iterate():
-        exec_img(p, cfg)
+        exec_img(s, cfg)
 
 if __name__ == "__main__":
     main()

@@ -44,6 +44,7 @@ class Alphamap:
 class AlphaExpandCfg:
     thickness: int = 1
     passes: int = 1
+    color_only: bool = False
     save_tmp: bool = False
 
 
@@ -51,14 +52,29 @@ class AlphaExpand:
     '''アルファチャンネル膨張と色拡張のユーティリティ'''
 
     @classmethod
-    def _expand(cls, img: Image, cfg: AlphaExpandCfg):
+    def expand(cls, img: Image, cfg: AlphaExpandCfg):
+        if not cfg.color_only:
+            return cls._expand_main(img, cfg)
+        else:
+            arr1 = np.array(img)
+            alpha = arr1[:, :, 3]
+
+            t = cls._expand_main(img, cfg)
+            arr2 = np.array(t)
+            ext_c = arr2[:, :, :3]
+
+            b = np.dstack([ext_c, alpha])
+            return Image.fromarray(b.astype(np.uint8), 'RGBA')
+
+    @classmethod
+    def _expand_main(cls, img: Image, cfg: AlphaExpandCfg):
         t = img
         for _ in range(cfg.passes):
-            t = cls._expand(t, cfg)
+            t = cls._expand_iter(t, cfg)
         return t
     
     @classmethod
-    def _expand(cls, img: Image, cfg: AlphaExpandCfg):
+    def _expand_iter(cls, img: Image, cfg: AlphaExpandCfg):
         if img.mode != 'RGBA':
             img = img.convert('RGBA')
         
@@ -229,7 +245,7 @@ class ImageResizeExt:
 
 
 class FilesOperator:
-    '''ファイルまたはディレクトリのリストを受け取り、ファイルを反復処理するユーティリティ''''
+    '''ファイルまたはディレクトリのリストを受け取り、ファイルを反復処理するユーティリティ'''
 
     def __init__(self, path_list: list[Path]):
         self.path_list = path_list
