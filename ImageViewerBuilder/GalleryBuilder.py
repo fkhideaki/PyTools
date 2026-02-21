@@ -7,19 +7,28 @@
 ## 使用方法
 - python GalleryBuilder.py <フォルダパス> [options]
 - options:
+  - --wheel
+    - 拡大画面をホイールでページ送りする機能を有効にする
   - --swipe
     - スマホ時にswipeでページ送りする機能を有効にする
 """
 
+from dataclasses import dataclass
 import sys
 from pathlib import Path
 from typing import List
 
-def generatePage(folder_path: Path, images: list[str], swipe: bool):
+@dataclass
+class Cfg:
+    swipe: bool = False
+    wheel: bool = False
+
+def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
     folder_name = folder_path.name
     title = f'{folder_name}'
 
-    enableSwipe = 'true' if swipe else 'false'
+    enableWheel = 'true' if cfg.wheel else 'false'
+    enableSwipe = 'true' if cfg.swipe else 'false'
 
     html_template = f"""\
 <!DOCTYPE html>
@@ -27,7 +36,6 @@ def generatePage(folder_path: Path, images: list[str], swipe: bool):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
     <style>
         * {{
             margin: 0;
@@ -217,6 +225,7 @@ def generatePage(folder_path: Path, images: list[str], swipe: bool):
             }}
         }}
     </style>
+    <title>{title}</title>
 </head>
 """
 
@@ -230,7 +239,7 @@ def generatePage(folder_path: Path, images: list[str], swipe: bool):
 
     images_json = '['
     for img in images:
-        images_json += f'\n"{img}"'
+        images_json += f'\n{{fn: "{img}", cap: "{Path(img).stem}"}}'
         if not img is images[-1]:
             images_json += ','
     images_json += '\n]'
@@ -247,16 +256,27 @@ def generatePage(folder_path: Path, images: list[str], swipe: bool):
         function showImage(index) {{
             const modalImg = document.getElementById('modal-img');
             const modalFilename = document.getElementById('modal-filename');
-            const fn = images[index];
+            const fn = images[index].fn;
+            const cap = images[index].cap;
             modalImg.src = fn;
             modalImg.alt = fn;
             const numImg = images.length;
-            modalFilename.textContent = fn + " (" + (index + 1) + "/" + numImg + ")";
+            modalFilename.textContent = cap + " (" + (index + 1) + "/" + numImg + ")";
+        }}
+        
+        function getIdx(filename) {{
+            let n = images.length;
+            for (var i = 0; i < n; ++i) {{
+                if (images[i].fn == filename) {{
+                    return i;
+                }}
+            }}
+            return -1;
         }}
         
         function openModal(filename) {{
             const modal = document.getElementById('modal');
-            currentIndex = images.indexOf(filename);
+            currentIndex = getIdx(filename);
             showImage(currentIndex);
             modal.classList.add('active');
         }}
@@ -290,7 +310,12 @@ def generatePage(folder_path: Path, images: list[str], swipe: bool):
             }}
         }});
 
+        let enableWheel = {enableWheel};
+        let enableSwipe = {enableSwipe};
+
         document.addEventListener('mousewheel', function(e) {{
+            if (!enableWheel) return;
+
             const modal = document.getElementById('modal');
             if (!modal.classList.contains('active')) return;
 
@@ -304,7 +329,6 @@ def generatePage(folder_path: Path, images: list[str], swipe: bool):
         // タッチスワイプイベント
         let touchStartX = 0;
         let touchEndX = 0;
-        let enableSwipe = {enableSwipe};
 
         function handleSwipe() {{
             if (!enableSwipe) return;
@@ -344,7 +368,8 @@ def generatePage(folder_path: Path, images: list[str], swipe: bool):
             var gallery = document.getElementsByClassName('gallery')[0];
             var n = images.length;
             for (var i = 0; i < n; ++i) {{
-                var fn = images[i];
+                var fn = images[i].fn;
+                var cap = images[i].cap;
                 var button = makeElem('div', 'image-container', gallery);
                 button.onclick = function() {{
                     var fn = this.children[0].children[0].alt;
@@ -356,7 +381,7 @@ def generatePage(folder_path: Path, images: list[str], swipe: bool):
                 img.alt = fn;
                 img.src = fn;
                 var name = makeElem('div', 'image-name', button);
-                name.innerHTML = fn;
+                name.innerHTML = cap;
             }}
         }}
 
@@ -400,7 +425,7 @@ def getImages(folder: Path) -> list[str]:
     
     return images
 
-def buidMain(folder: Path, opt: List[str]):
+def buildMain(folder: Path, opt: List[str]):
     if not folder.is_dir():
         print(f'{folder} is not folder')
         return
@@ -410,8 +435,10 @@ def buidMain(folder: Path, opt: List[str]):
         print(f"{folder} に画像ファイルが見つかりませんでした")
         return
 
-    swipe = '--swipe' in opt
-    html = generatePage(folder, images, swipe)
+    cfg = Cfg()
+    cfg.wheel = '--wheel' in opt
+    cfg.swipe = '--swipe' in opt
+    html = generatePage(folder, images, cfg)
 
     outFN = folder / "gallery.html"
     with open(outFN, 'w', encoding='utf-8') as f:
@@ -432,7 +459,7 @@ def main():
                 dirs.append(p)
 
     for d in dirs:
-        buidMain(d, opt)
+        buildMain(d, opt)
 
 if __name__ == "__main__":
     main()
