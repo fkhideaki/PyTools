@@ -36,9 +36,9 @@ def make_bat(py: Path, cfg: Cfg, arg_files: list[str]):
     arg = ' '.join([f'"{s}"' for s in arg_files])
     if cfg.cd:
         yield f'cd "{py.parent}"'
-        yield f'call "{cfg.py_cmd}" "{py.name}" {arg} %*'
+        yield f'"{cfg.py_cmd}" "{py.name}" {arg} %*'
     else:
-        yield f'call "{cfg.py_cmd}" "{py.resolve()}" {arg} %*'
+        yield f'"{cfg.py_cmd}" "{py.resolve()}" {arg} %*'
     if cfg.pause:
         yield 'pause'
 
