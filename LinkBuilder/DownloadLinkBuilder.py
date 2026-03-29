@@ -1,0 +1,407 @@
+"""
+## 概要
+- フォルダ内のファイル一覧HTMLを生成するスクリプト
+
+## 使い方
+- python DownloadLinkBuilder.py <フォルダパス>
+
+## options
+- --sort : テーブルのソート機能を有効化
+- --title <タイトル> : ページタイトルを指定（省略時は'##TITLE##'という形式のプレースホルダ）
+"""
+
+import argparse
+import sys
+import math
+from datetime import datetime
+from pathlib import Path
+from html import escape
+
+
+# ファイル拡張子に対応するアイコン（絵文字）
+ICON_MAP = {
+    # 圧縮ファイル
+    ".zip": "📦", ".gz": "📦", ".tar": "📦", ".rar": "📦", ".7z": "📦",
+    ".bz2": "📦", ".xz": "📦",
+    # ドキュメント
+    ".pdf": "📄", ".doc": "📝", ".docx": "📝", ".odt": "📝",
+    ".xls": "📊", ".xlsx": "📊", ".ods": "📊",
+    ".ppt": "📋", ".pptx": "📋", ".odp": "📋",
+    ".txt": "📃", ".md": "📃", ".rst": "📃",
+    # 画像
+    ".jpg": "🖼️", ".jpeg": "🖼️", ".png": "🖼️", ".gif": "🖼️",
+    ".svg": "🖼️", ".webp": "🖼️", ".bmp": "🖼️", ".ico": "🖼️",
+    # 動画
+    ".mp4": "🎬", ".mov": "🎬", ".avi": "🎬", ".mkv": "🎬",
+    ".webm": "🎬", ".flv": "🎬",
+    # 音声
+    ".mp3": "🎵", ".wav": "🎵", ".ogg": "🎵", ".flac": "🎵", ".aac": "🎵",
+    # コード
+    ".py": "🐍", ".js": "📜", ".ts": "📜", ".html": "🌐",
+    ".css": "🎨", ".json": "📋", ".xml": "📋", ".yaml": "📋", ".yml": "📋",
+    ".sh": "⚙️", ".bash": "⚙️", ".bat": "⚙️", ".ps1": "⚙️",
+    # データ
+    ".csv": "📊", ".tsv": "📊", ".sql": "🗄️", ".db": "🗄️",
+    # 実行ファイル
+    ".exe": "⚙️", ".msi": "⚙️", ".dmg": "⚙️", ".deb": "⚙️", ".rpm": "⚙️",
+    # フォルダ
+    "__dir__": "📁",
+    # デフォルト
+    "__default__": "📎",
+}
+
+def get_icon(path: Path) -> str:
+    if path.is_dir():
+        return ICON_MAP["__dir__"]
+    return ICON_MAP.get(path.suffix.lower(), ICON_MAP["__default__"])
+
+
+def format_size(size_bytes: int) -> str:
+    """バイト数を人間が読みやすい形式に変換"""
+    if size_bytes == 0:
+        return "0 B"
+    units = ["B", "KB", "MB", "GB", "TB"]
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    i = min(i, len(units) - 1)
+    val = size_bytes / (1024 ** i)
+    if i == 0:
+        return f"{int(val)} B"
+    return f"{val:.1f} {units[i]}"
+
+
+def format_mtime(mtime: float) -> str:
+    """更新日時をフォーマット"""
+    return datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+
+
+def generate_html(folder: Path, title: str, enable_sort: bool) -> str:
+    """index.html の内容を生成"""
+
+    entries = []
+    for item in sorted(folder.iterdir()):
+        if item.name == "index.html":
+            continue
+        if not item.is_file():
+            continue
+        stat = item.stat()
+        entries.append({
+            "name": item.name,
+            "icon": get_icon(item),
+            "size_bytes": stat.st_size,
+            "mtime": format_mtime(stat.st_mtime),
+        })
+
+    entries.sort(key=lambda e: e["name"].lower())
+
+    if not entries:
+        rows_html = '<tr><td colspan="4" class="empty-msg">ファイルが見つかりません</td></tr>'
+    else:
+        rows_html = ""
+        for e in entries:
+            name = e['name']
+            size_bytes = e['size_bytes']
+            size = format_size(size_bytes)
+            icon = e['icon']
+            mtime = e['mtime']
+            rows_html += f"""\
+          <tr class="entry-row" data-name="{escape(name.lower())}" data-size="{size_bytes}">
+            <td class="col-icon">{icon}</td>
+            <td class="col-name">
+              <a href="{escape(name)}" class="file-link" download>{escape(name)}</a>
+            </td>
+            <td class="col-size">{size}</td>
+            <td class="col-date">{mtime}</td>
+            <td class="col-action">
+              {'<a href="' + escape(name) + '" class="btn-dl" download title="ダウンロード">↓</a>'}
+            </td>
+          </tr>"""
+
+    main_table = f'''\
+      <table id="file-table">
+        <thead>
+          <tr>
+            <th class="col-icon"></th>
+            <th class="col-name" data-col="name">Name</th>
+            <th class="col-size" data-col="size">Size</th>
+            <th class="col-date" data-col="date">Modified</th>
+            <th class="col-action">Download</th>
+          </tr>
+        </thead>
+        <tbody id="file-body">
+{rows_html}
+        </tbody>
+      </table>
+'''
+    sort_script = '' if not enable_sort else '''\
+  <script>
+    // ── テーブルソート ────────────────────────────────────
+    const tbody = document.getElementById('file-body');
+    let sortCol = null;
+    let sortAsc = true;
+
+    document.querySelectorAll('th[data-col]').forEach(th => {{
+      th.addEventListener('click', () => {{
+        const col = th.dataset.col;
+        if (sortCol === col) {{
+          sortAsc = !sortAsc;
+        }} else {{
+          sortCol = col;
+          sortAsc = true;
+        }}
+        document.querySelectorAll('th').forEach(t => t.classList.remove('sort-asc', 'sort-desc'));
+        th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+
+        const rowArr = Array.from(tbody.querySelectorAll('.entry-row'));
+        rowArr.sort((a, b) => {{
+          let av, bv;
+          if (col === 'name') {{
+            av = a.dataset.name;
+            bv = b.dataset.name;
+            return sortAsc ? av.localeCompare(bv, 'ja') : bv.localeCompare(av, 'ja');
+          }} else if (col === 'size') {{
+            av = parseInt(a.dataset.size) || 0;
+            bv = parseInt(b.dataset.size) || 0;
+            return sortAsc ? av - bv : bv - av;
+          }} else if (col === 'date') {{
+            av = a.querySelector('.col-date')?.textContent || '';
+            bv = b.querySelector('.col-date')?.textContent || '';
+            return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+          }}
+          return 0;
+        }});
+        rowArr.forEach(r => tbody.appendChild(r));
+      }});
+    }});
+  </script>
+'''
+
+    return f"""\
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────── */
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
+    :root {{
+      --bg:        #f5f7fa;
+      --surface:   #ffffff;
+      --border:    #dde2ea;
+      --accent:    #2563eb;
+      --accent2:   #7c3aed;
+      --text:      #1e2433;
+      --muted:     #6b7280;
+      --hover-row: #f0f4ff;
+      --radius:    10px;
+      --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+      --font-sans: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif;
+    }}
+
+    body {{
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }}
+
+    /* ─── Layout ────────────────────────────────────────── */
+    .container {{
+      max-width: 960px;
+      margin: 0 auto;
+    }}
+
+    /* ─── Header ────────────────────────────────────────── */
+    .header {{
+      margin-bottom: 1.5rem;
+    }}
+
+    .header-top {{
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }}
+
+    .folder-badge {{
+      font-size: 2.5rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }}
+
+    .header-text h1 {{
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      word-break: break-all;
+    }}
+
+    /* ─── Table ─────────────────────────────────────────── */
+    .table-wrap {{
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }}
+
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+    }}
+
+    thead tr {{
+      background: #eef1f6;
+      border-bottom: 1px solid var(--border);
+    }}
+
+    th {{
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 600;
+      user-select: none;
+      white-space: nowrap;
+      {"cursor: pointer;" if enable_sort else ""}
+    }}
+
+    th:hover {{ color: var(--text); }}
+    th.sort-asc::after  {{ content: " ↑"; color: var(--accent); }}
+    th.sort-desc::after {{ content: " ↓"; color: var(--accent); }}
+
+    .entry-row {{
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+      opacity: 0;
+      animation: fadeIn 0.35s ease forwards;
+    }}
+
+    @keyframes fadeIn {{
+      from {{ opacity: 0; transform: translateY(6px); }}
+      to   {{ opacity: 1; transform: translateY(0); }}
+    }}
+
+    .entry-row:last-child {{ border-bottom: none; }}
+    .entry-row:hover {{ background: var(--hover-row); }}
+
+    td {{
+      padding: 0.7rem 1rem;
+      font-size: 0.88rem;
+      vertical-align: middle;
+    }}
+
+    .col-icon   {{ width: 2rem; font-size: 1.1rem; padding-right: 0; }}
+    .col-name   {{ max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+    .col-size   {{ width: 7rem; text-align: right; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }}
+    .col-date   {{ width: 11rem; text-align: right; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }}
+    .col-action {{ width: 3rem; text-align: center; }}
+
+    @media (max-width: 600px) {{
+      .col-date {{ display: none; }}
+      .col-size {{ width: 5.5rem; }}
+    }}
+
+    .file-link {{
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.15s;
+    }}
+
+    .file-link:hover {{ color: var(--accent); }}
+
+    .btn-dl {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.8rem;
+      height: 1.8rem;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+    }}
+
+    .btn-dl:hover {{
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }}
+
+    .empty-msg {{
+      text-align: center;
+      color: var(--muted);
+      padding: 3rem !important;
+      font-style: italic;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <header class="header">
+      <div class="header-top">
+        <div class="folder-badge">📂</div>
+        <div class="header-text">
+          <h1>{title}</h1>
+        </div>
+      </div>
+    </header>
+
+    <!-- テーブル -->
+    <div class="table-wrap">
+{main_table}
+    </div>
+  </div>
+{sort_script}
+</body>
+</html>
+"""
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="フォルダ内のファイル一覧 index.html を生成します",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+例:
+  python generate_index.py ./downloads
+        """,
+    )
+    parser.add_argument("folder", help="対象フォルダのパス")
+    parser.add_argument("--sort", action="store_true", help="テーブルのソート機能を有効化")
+    parser.add_argument("--title", default=None, help="ページタイトル")
+    args = parser.parse_args()
+
+    folder = Path(args.folder).resolve()
+    if not folder.is_dir():
+        print(f"❌ エラー: フォルダを指定してください: {folder}", file=sys.stderr)
+        sys.exit(1)
+
+    title = args.title
+    if not title:
+        title = '##TITLE##'
+
+    html = generate_html(folder, title, args.sort)
+
+    output_path = folder / "index.html"
+    output_path.write_text(html, encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()
