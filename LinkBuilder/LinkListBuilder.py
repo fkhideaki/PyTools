@@ -7,10 +7,13 @@
 
 ## options
 - --sort : テーブルのソート機能を有効化
+- --preview : ファイル名クリックで、プレビュー(可能な場合)、それと別にダウンロードボタンを表示
+- --php : phpのダウンロードカウント付きページを作成
 - --title <タイトル> : ページタイトルを指定（省略時は'##TITLE##'という形式のプレースホルダ）
 """
 
 import argparse
+from dataclasses import dataclass
 import sys
 import math
 from datetime import datetime
@@ -56,6 +59,13 @@ def get_icon(path: Path) -> str:
     return ICON_MAP.get(path.suffix.lower(), ICON_MAP["__default__"])
 
 
+@dataclass
+class Config:
+    enable_sort: bool = False
+    enable_preview: bool = False
+    php_mode: bool = False
+
+
 def format_size(size_bytes: int) -> str:
     """バイト数を人間が読みやすい形式に変換"""
     if size_bytes == 0:
@@ -74,21 +84,21 @@ def format_mtime(mtime: float) -> str:
     return datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
 
 
-def generate_html(folder: Path, title: str, enable_sort: bool) -> str:
+def generate_html(folder: Path, title: str, cfg: Config) -> str:
     """index.html の内容を生成"""
 
     entries = []
     for item in sorted(folder.iterdir()):
-        if item.name == "index.html":
-            continue
         if not item.is_file():
+            continue
+        if item.name in ['index.html', 'index.php', '_download.php', '_count.json']:
             continue
         stat = item.stat()
         entries.append({
-            "name": item.name,
-            "icon": get_icon(item),
-            "size_bytes": stat.st_size,
-            "mtime": format_mtime(stat.st_mtime),
+            'name': item.name,
+            'icon': get_icon(item),
+            'size_bytes': stat.st_size,
+            'mtime': format_mtime(stat.st_mtime),
         })
 
     entries.sort(key=lambda e: e["name"].lower())
@@ -99,22 +109,30 @@ def generate_html(folder: Path, title: str, enable_sort: bool) -> str:
         rows_html = ""
         for e in entries:
             name = e['name']
+            name_esc = escape(name)
+            name_lower = escape(name.lower())
             size_bytes = e['size_bytes']
             size = format_size(size_bytes)
             icon = e['icon']
             mtime = e['mtime']
+            td_size = f'<td class="col-size">{size}</td>'
+            td_date = f'<td class="col-date">{mtime}</td>'
+            if cfg.php_mode:
+                download_url = f'_download.php?file={name_esc}'
+            else:
+                download_url = name_esc
+            td_act = f'<td class="col-action"><a href="{download_url}" class="btn-dl" download title="ダウンロード">↓</a></td>'
             rows_html += f"""\
-          <tr class="entry-row" data-name="{escape(name.lower())}" data-size="{size_bytes}">
+          <tr class="entry-row" data-name="{name_lower}" data-size="{size_bytes}">
             <td class="col-icon">{icon}</td>
             <td class="col-name">
-              <a href="{escape(name)}" class="file-link" download>{escape(name)}</a>
+              <a href="{download_url}" class="file-link" {'download' if not cfg.enable_preview else ''}>{name_esc}</a>
             </td>
-            <td class="col-size">{size}</td>
-            <td class="col-date">{mtime}</td>
-            <td class="col-action">
-              {'<a href="' + escape(name) + '" class="btn-dl" download title="ダウンロード">↓</a>'}
-            </td>
-          </tr>"""
+            {td_size}
+            {td_date}
+            {td_act if cfg.enable_preview else ''}
+          </tr>
+"""
 
     main_table = f'''\
       <table id="file-table">
@@ -124,7 +142,7 @@ def generate_html(folder: Path, title: str, enable_sort: bool) -> str:
             <th class="col-name" data-col="name">Name</th>
             <th class="col-size" data-col="size">Size</th>
             <th class="col-date" data-col="date">Modified</th>
-            <th class="col-action">Download</th>
+            {'<th class="col-action">Download</th>' if cfg.enable_preview else ''}
           </tr>
         </thead>
         <tbody id="file-body">
@@ -132,7 +150,7 @@ def generate_html(folder: Path, title: str, enable_sort: bool) -> str:
         </tbody>
       </table>
 '''
-    sort_script = '' if not enable_sort else '''\
+    sort_script = '' if not cfg.enable_sort else '''\
   <script>
     // ── テーブルソート ────────────────────────────────────
     const tbody = document.getElementById('file-body');
@@ -272,7 +290,7 @@ def generate_html(folder: Path, title: str, enable_sort: bool) -> str:
       font-weight: 600;
       user-select: none;
       white-space: nowrap;
-      {"cursor: pointer;" if enable_sort else ""}
+      {"cursor: pointer;" if cfg.enable_sort else ""}
     }}
 
     th:hover {{ color: var(--text); }}
@@ -302,8 +320,8 @@ def generate_html(folder: Path, title: str, enable_sort: bool) -> str:
 
     .col-icon   {{ width: 2rem; font-size: 1.1rem; padding-right: 0; }}
     .col-name   {{ max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-    .col-size   {{ width: 7rem; text-align: right; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }}
-    .col-date   {{ width: 11rem; text-align: right; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }}
+    .col-size   {{ width: 7rem; text-align: center; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }}
+    .col-date   {{ width: 11rem; text-align: center; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }}
     .col-action {{ width: 3rem; text-align: center; }}
 
     @media (max-width: 600px) {{
@@ -374,6 +392,78 @@ def generate_html(folder: Path, title: str, enable_sort: bool) -> str:
 """
 
 
+download_api = r'''
+<?php
+define('FILES_DIR',  __DIR__ . '/');
+define('COUNTS_FILE', __DIR__ . '/_counts.json');
+
+$requested = isset($_GET['file']) ? basename($_GET['file']) : '';
+$file_path = FILES_DIR . $requested;
+
+function verifyFile()
+{
+    global $file_path;
+
+    if (!is_file($file_path)) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+}
+
+function addCount()
+{
+    global $requested;
+
+    $counts = [];
+
+    $fp = fopen(COUNTS_FILE, 'c+');
+    if ($fp === false) {
+        http_response_code(500);
+        exit('Could not open counts file.');
+    }
+
+    if (flock($fp, LOCK_EX)) {
+        $size = filesize(COUNTS_FILE);
+        if ($size > 0) {
+            $json = fread($fp, $size);
+            $counts = json_decode($json, true) ?? [];
+        }
+
+        $counts[$requested] = ($counts[$requested] ?? 0) + 1;
+
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($counts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        fflush($fp);
+        flock($fp, LOCK_UN);
+    }
+    fclose($fp);
+}
+
+function execDownload()
+{
+    global $requested;
+    global $file_path;
+
+    $mime = mime_content_type($file_path) ?: 'application/octet-stream';
+
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: attachment; filename="' . rawurlencode($requested) . '"');
+    header('Content-Length: ' . filesize($file_path));
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    readfile($file_path);
+    exit;
+}
+
+verifyFile();
+addCount();
+execDownload();
+'''
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="フォルダ内のファイル一覧 index.html を生成します",
@@ -385,6 +475,8 @@ def main():
     )
     parser.add_argument("folder", help="対象フォルダのパス")
     parser.add_argument("--sort", action="store_true", help="テーブルのソート機能を有効化")
+    parser.add_argument("--preview", action="store_true", help="プレビュー表示/ダウンロード分離")
+    parser.add_argument("--php", action="store_true", help="phpモード")
     parser.add_argument("--title", default=None, help="ページタイトル")
     args = parser.parse_args()
 
@@ -397,10 +489,23 @@ def main():
     if not title:
         title = '##TITLE##'
 
-    html = generate_html(folder, title, args.sort)
+    cfg = Config()
+    cfg.enable_sort = args.sort
+    cfg.enable_preview = args.preview
+    cfg.php_mode = args.php
 
-    output_path = folder / "index.html"
-    output_path.write_text(html, encoding="utf-8")
+    html = generate_html(folder, title, cfg)
+
+    if cfg.php_mode:
+        (folder / "index.php").write_text(html, encoding="utf-8")
+        dl_api = folder / "_download.php"
+        dl_api.write_text(download_api, encoding="utf-8")
+        count = folder / "_counts.json"
+        if not count.exists():
+            count.write_text('{}', encoding="utf-8")
+    else:
+        output_path = folder / "index.html"
+        output_path.write_text(html, encoding="utf-8")
 
 
 if __name__ == "__main__":
