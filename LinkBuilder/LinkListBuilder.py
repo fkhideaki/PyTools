@@ -6,8 +6,10 @@
 - python DownloadLinkBuilder.py <フォルダパス>
 
 ## options
+- --page_list : ダウンロード用ではなく通常のページリストを作成
 - --sort : テーブルのソート機能を有効化
 - --preview : ファイル名クリックで、プレビュー(可能な場合)、それと別にダウンロードボタンを表示
+- --modified : 更新日時を表示
 - --php : phpのダウンロードカウント付きページを作成
 - --title <タイトル> : ページタイトルを指定（省略時は'##TITLE##'という形式のプレースホルダ）
 """
@@ -61,8 +63,10 @@ def get_icon(path: Path) -> str:
 
 @dataclass
 class Config:
+    page_list: bool = False
     enable_sort: bool = False
     enable_preview: bool = False
+    enable_modified: bool = False
     php_mode: bool = False
 
 
@@ -103,6 +107,10 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
 
     entries.sort(key=lambda e: e["name"].lower())
 
+    use_size_bytes = not cfg.page_list
+    use_modified = cfg.show_modified and not cfg.page_list
+    use_download = cfg.enable_preview and not cfg.page_list
+    download_link = not cfg.enable_preview and not cfg.page_list
     if not entries:
         rows_html = '<tr><td colspan="4" class="empty-msg">ファイルが見つかりません</td></tr>'
     else:
@@ -126,11 +134,11 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
           <tr class="entry-row" data-name="{name_lower}" data-size="{size_bytes}">
             <td class="col-icon">{icon}</td>
             <td class="col-name">
-              <a href="{download_url}" class="file-link" {'download' if not cfg.enable_preview else ''}>{name_esc}</a>
+              <a href="{download_url}" class="file-link" {'download' if download_link else ''}>{name_esc}</a>
             </td>
-            {td_size}
-            {td_date}
-            {td_act if cfg.enable_preview else ''}
+            {td_size if use_size_bytes else ''}
+            {td_date if use_modified else ''}
+            {td_act if use_download else ''}
           </tr>
 """
 
@@ -140,9 +148,9 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
           <tr>
             <th class="col-icon"></th>
             <th class="col-name" data-col="name">Name</th>
-            <th class="col-size" data-col="size">Size</th>
-            <th class="col-date" data-col="date">Modified</th>
-            {'<th class="col-action">Download</th>' if cfg.enable_preview else ''}
+            {'<th class="col-size" data-col="size">Size</th>' if use_size_bytes else ''}
+            {'<th class="col-date" data-col="date">Modified</th>' if use_modified else ''}
+            {'<th class="col-action">Download</th>' if use_download else ''}
           </tr>
         </thead>
         <tbody id="file-body">
@@ -474,8 +482,10 @@ def main():
         """,
     )
     parser.add_argument("folder", help="対象フォルダのパス")
+    parser.add_argument("--page_list", action="store_true", help="ダウンロード用ではなく通常のページリストを作成")
     parser.add_argument("--sort", action="store_true", help="テーブルのソート機能を有効化")
     parser.add_argument("--preview", action="store_true", help="プレビュー表示/ダウンロード分離")
+    parser.add_argument("--modified", action="store_true", help="更新日時を表示")
     parser.add_argument("--php", action="store_true", help="phpモード")
     parser.add_argument("--title", default=None, help="ページタイトル")
     args = parser.parse_args()
@@ -490,8 +500,10 @@ def main():
         title = '##TITLE##'
 
     cfg = Config()
+    cfg.page_list = args.page_list
     cfg.enable_sort = args.sort
     cfg.enable_preview = args.preview
+    cfg.show_modified = args.modified
     cfg.php_mode = args.php
 
     html = generate_html(folder, title, cfg)
