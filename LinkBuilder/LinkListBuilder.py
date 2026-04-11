@@ -6,13 +6,17 @@
 - python DownloadLinkBuilder.py <フォルダパス>
 
 ## options
-- --page_list : ダウンロード用ではなく通常のページリストを作成
-- --sort : テーブルのソート機能を有効化
-- --preview : ファイル名クリックで、プレビュー(可能な場合)、それと別にダウンロードボタンを表示
-- --modified : 更新日時を表示
+- --gui : GUIモードで実行
 - --php : phpのダウンロードカウント付きページを作成
 - --title <タイトル> : ページタイトルを指定（省略時は'##TITLE##'という形式のプレースホルダ）
+- --page_list : ダウンロード用ではなく通常のページリストを作成
+- --download : リンクをdownload指定で生成
+- --action : ダウンロード用アクションボタンを表示
+- --sort : テーブルのソート機能を有効化
+- --modified : 更新日時を表示
+- --size : サイズを表示
 """
+
 
 import argparse
 from dataclasses import dataclass
@@ -21,6 +25,13 @@ import math
 from datetime import datetime
 from pathlib import Path
 from html import escape
+from typing import Optional
+
+
+import tkinter as tk
+from tkinter import filedialog, messagebox
+import tkinter as tk
+import tkinterdnd2 as tkdnd
 
 
 # ファイル拡張子に対応するアイコン（絵文字）
@@ -35,7 +46,8 @@ ICON_MAP = {
     ".txt": "📃", ".md": "📃", ".rst": "📃",
     # 画像
     ".jpg": "🖼️", ".jpeg": "🖼️", ".png": "🖼️", ".gif": "🖼️",
-    ".svg": "🖼️", ".webp": "🖼️", ".bmp": "🖼️", ".ico": "🖼️",
+    ".jpg": "🖼️", ".jpeg": "🖼️", ".png": "🖼️", ".gif": "🖼️",
+    ".ai": "🖼️",
     # 動画
     ".mp4": "🎬", ".mov": "🎬", ".avi": "🎬", ".mkv": "🎬",
     ".webm": "🎬", ".flv": "🎬",
@@ -63,11 +75,12 @@ def get_icon(path: Path) -> str:
 
 @dataclass
 class Config:
-    page_list: bool = False
-    enable_sort: bool = False
-    enable_preview: bool = False
-    enable_modified: bool = False
     php_mode: bool = False
+    download_link: bool = False
+    enable_action: bool = False
+    enable_sort: bool = False
+    show_modified: bool = False
+    show_size: bool = False
 
 
 def format_size(size_bytes: int) -> str:
@@ -86,7 +99,6 @@ def format_size(size_bytes: int) -> str:
 def format_mtime(mtime: float) -> str:
     """更新日時をフォーマット"""
     return datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-
 
 def generate_html(folder: Path, title: str, cfg: Config) -> str:
     """index.html の内容を生成"""
@@ -107,10 +119,10 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
 
     entries.sort(key=lambda e: e["name"].lower())
 
-    use_size_bytes = not cfg.page_list
-    use_modified = cfg.show_modified and not cfg.page_list
-    use_download = cfg.enable_preview and not cfg.page_list
-    download_link = not cfg.enable_preview and not cfg.page_list
+    use_size_bytes = cfg.show_size
+    use_modified = cfg.show_modified
+    use_download = cfg.enable_action
+    download_link = cfg.download_link
     if not entries:
         rows_html = '<tr><td colspan="4" class="empty-msg">ファイルが見つかりません</td></tr>'
     else:
@@ -472,40 +484,7 @@ execDownload();
 '''
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="フォルダ内のファイル一覧 index.html を生成します",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-例:
-  python generate_index.py ./downloads
-        """,
-    )
-    parser.add_argument("folder", help="対象フォルダのパス")
-    parser.add_argument("--page_list", action="store_true", help="ダウンロード用ではなく通常のページリストを作成")
-    parser.add_argument("--sort", action="store_true", help="テーブルのソート機能を有効化")
-    parser.add_argument("--preview", action="store_true", help="プレビュー表示/ダウンロード分離")
-    parser.add_argument("--modified", action="store_true", help="更新日時を表示")
-    parser.add_argument("--php", action="store_true", help="phpモード")
-    parser.add_argument("--title", default=None, help="ページタイトル")
-    args = parser.parse_args()
-
-    folder = Path(args.folder).resolve()
-    if not folder.is_dir():
-        print(f"❌ エラー: フォルダを指定してください: {folder}", file=sys.stderr)
-        sys.exit(1)
-
-    title = args.title
-    if not title:
-        title = '##TITLE##'
-
-    cfg = Config()
-    cfg.page_list = args.page_list
-    cfg.enable_sort = args.sort
-    cfg.enable_preview = args.preview
-    cfg.show_modified = args.modified
-    cfg.php_mode = args.php
-
+def generate_main(folder, title, cfg):
     html = generate_html(folder, title, cfg)
 
     if cfg.php_mode:
@@ -518,6 +497,94 @@ def main():
     else:
         output_path = folder / "index.html"
         output_path.write_text(html, encoding="utf-8")
+
+
+def gui_mode():
+    root = tkdnd.Tk()
+    root.title("LinkListBuilder GUI")
+    root.geometry("400x300")
+    root.resizable(False, False)
+    php_var = tk.BooleanVar()
+    tk.Checkbutton(root, text="PHPモード (--php)", variable=php_var).pack(anchor='w', padx=20)
+    download_link_var = tk.BooleanVar()
+    tk.Checkbutton(root, text="リンクをdownload指定で生成 (--download)", variable=download_link_var).pack(anchor='w', padx=20)
+    enable_action_var = tk.BooleanVar()
+    tk.Checkbutton(root, text="アクションボタン (--action)", variable=enable_action_var).pack(anchor='w', padx=20)
+    sort_var = tk.BooleanVar()
+    tk.Checkbutton(root, text="テーブルソート有効 (--sort)", variable=sort_var).pack(anchor='w', padx=20)
+    modified_var = tk.BooleanVar()
+    tk.Checkbutton(root, text="更新日時表示 (--modified)", variable=modified_var).pack(anchor='w', padx=20)
+    size_var = tk.BooleanVar()
+    tk.Checkbutton(root, text="サイズ表示 (--size)", variable=size_var).pack(anchor='w', padx=20)
+
+    tk.Label(root, text="ページタイトル (--title)", font=("Arial", 12)).pack(pady=10)
+    title_entry = tk.Entry(root, width=30)
+    title_entry.pack()
+    title_entry.insert(0, "##TITLE##")
+    tk.Label(root, text="フォルダをこのウィンドウにドロップしてください", font=("Arial", 10)).pack(pady=20)
+
+    def on_drop(event):
+        folder_path = event.data.strip('{}')  # ドロップされたパスを取得
+        folder = Path(folder_path)
+        if not folder.is_dir():
+            messagebox.showerror("エラー", "有効なフォルダをドロップしてください")
+            return
+        cfg = Config(
+            php_mode=php_var.get(),
+            download_link=download_link_var.get(),
+            enable_action=enable_action_var.get(),
+            enable_sort=sort_var.get(),
+            show_modified=modified_var.get(),
+            show_size=size_var.get()
+        )
+        title = title_entry.get() or "##TITLE##"
+        generate_main(folder, title, cfg)
+    root.drop_target_register(tkdnd.DND_FILES)
+    root.dnd_bind('<<Drop>>', on_drop)
+    root.mainloop()
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="フォルダ内のファイル一覧 index.html を生成します",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+例:
+  python generate_index.py ./downloads
+        """,
+    )
+    parser.add_argument("folder", nargs="?", help="対象フォルダのパス")
+    parser.add_argument("--gui", action="store_true", help="GUIモードで実行")
+    parser.add_argument("--php", action="store_true", help="phpモード")
+    parser.add_argument("--title", default=None, help="ページタイトル")
+    parser.add_argument("--download", action="store_true", help="リンクをdownload指定で生成")
+    parser.add_argument("--action", action="store_true", help="ダウンロード用アクションボタンを表示")
+    parser.add_argument("--sort", action="store_true", help="テーブルのソート機能を有効化")
+    parser.add_argument("--modified", action="store_true", help="更新日時を表示")
+    parser.add_argument("--size", action="store_true", help="サイズを表示")
+    args = parser.parse_args()
+
+    if args.gui:
+        gui_mode()
+        return
+
+    folder = Path(args.folder).resolve()
+    if not folder.is_dir():
+        print(f"❌ エラー: フォルダを指定してください: {folder}", file=sys.stderr)
+        sys.exit(1)
+
+    title = args.title
+    if not title:
+        title = '##TITLE##'
+
+    cfg = Config()
+    cfg.php_mode = args.php
+    cfg.download_link = args.download
+    cfg.enable_action = args.action
+    cfg.enable_sort = args.sort
+    cfg.show_modified = args.modified
+    cfg.show_size = args.size
+
+    generate_main(folder, title, cfg)
 
 
 if __name__ == "__main__":
