@@ -15,6 +15,7 @@
 - --sort : テーブルのソート機能を有効化
 - --modified : 更新日時を表示
 - --size : サイズを表示
+- --desc : 説明を表示する列を追加
 """
 
 
@@ -81,6 +82,7 @@ class Config:
     enable_sort: bool = False
     show_modified: bool = False
     show_size: bool = False
+    show_desc: bool = False
 
 
 def format_size(size_bytes: int) -> str:
@@ -119,6 +121,7 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
 
     entries.sort(key=lambda e: e["name"].lower())
 
+    use_desc = cfg.show_desc
     use_size_bytes = cfg.show_size
     use_modified = cfg.show_modified
     use_download = cfg.enable_action
@@ -135,6 +138,7 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
             size = format_size(size_bytes)
             icon = e['icon']
             mtime = e['mtime']
+            td_desc = '<td class="col-desc">##description##</td>'
             td_size = f'<td class="col-size">{size}</td>'
             td_date = f'<td class="col-date">{mtime}</td>'
             if cfg.php_mode:
@@ -148,6 +152,7 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
             <td class="col-name">
               <a href="{download_url}" class="file-link" {'download' if download_link else ''}>{name_esc}</a>
             </td>
+            {td_desc if use_desc else ''}
             {td_size if use_size_bytes else ''}
             {td_date if use_modified else ''}
             {td_act if use_download else ''}
@@ -160,6 +165,7 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
           <tr>
             <th class="col-icon"></th>
             <th class="col-name" data-col="name">Name</th>
+            {'<th class="col-desc" data-col="desc">Description</th>' if use_desc else ''}
             {'<th class="col-size" data-col="size">Size</th>' if use_size_bytes else ''}
             {'<th class="col-date" data-col="date">Modified</th>' if use_modified else ''}
             {'<th class="col-action">Download</th>' if use_download else ''}
@@ -340,6 +346,7 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
 
     .col-icon   {{ width: 2rem; font-size: 1.1rem; padding-right: 0; }}
     .col-name   {{ max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+    .col-desc   {{ width: 12rem; color: var(--muted); font-size: 0.85rem; }}
     .col-size   {{ width: 7rem; text-align: center; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }}
     .col-date   {{ width: 11rem; text-align: center; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }}
     .col-action {{ width: 3rem; text-align: center; }}
@@ -516,6 +523,8 @@ def gui_mode():
     tk.Checkbutton(root, text="更新日時表示 (--modified)", variable=modified_var).pack(anchor='w', padx=20)
     size_var = tk.BooleanVar()
     tk.Checkbutton(root, text="サイズ表示 (--size)", variable=size_var).pack(anchor='w', padx=20)
+    desc_var = tk.BooleanVar()
+    tk.Checkbutton(root, text="説明表示 (--desc)", variable=desc_var).pack(anchor='w', padx=20)
 
     tk.Label(root, text="ページタイトル (--title)", font=("Arial", 12)).pack(pady=10)
     title_entry = tk.Entry(root, width=30)
@@ -535,7 +544,8 @@ def gui_mode():
             enable_action=enable_action_var.get(),
             enable_sort=sort_var.get(),
             show_modified=modified_var.get(),
-            show_size=size_var.get()
+            show_size=size_var.get(),
+            show_desc=desc_var.get()
         )
         title = title_entry.get() or "##TITLE##"
         generate_main(folder, title, cfg)
@@ -561,6 +571,7 @@ def main():
     parser.add_argument("--sort", action="store_true", help="テーブルのソート機能を有効化")
     parser.add_argument("--modified", action="store_true", help="更新日時を表示")
     parser.add_argument("--size", action="store_true", help="サイズを表示")
+    parser.add_argument("--desc", action="store_true", help="説明を表示する列を追加")
     args = parser.parse_args()
 
     if args.gui:
@@ -583,6 +594,7 @@ def main():
     cfg.enable_sort = args.sort
     cfg.show_modified = args.modified
     cfg.show_size = args.size
+    cfg.show_desc = args.desc
 
     generate_main(folder, title, cfg)
 
