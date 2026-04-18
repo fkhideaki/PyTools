@@ -440,7 +440,7 @@ def buildMain(folder: Path, opt: List[str]):
     cfg.swipe = '--swipe' in opt
     html = generatePage(folder, images, cfg)
 
-    outFN = folder / "gallery.html"
+    outFN = folder / "index.html"
     with open(outFN, 'w', encoding='utf-8') as f:
         f.write(html)
 
