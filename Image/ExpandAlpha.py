@@ -11,6 +11,7 @@
   - --thick:[n] : 膨張の太さを指定
   - --pass:[n] : 膨張の繰り返し回数
   - --saveTmp : 中間結果を保存する
+  - --overwrite : 上書き保存する
 '''
 
 
@@ -20,14 +21,17 @@ from PIL import Image
 from lib.ImageUT import AlphaExpand, AlphaExpandCfg, FilesOperator
 
 
-def exec_img(fp, cfg: AlphaExpandCfg):
+def exec_img(fp, cfg: AlphaExpandCfg, overwrite):
     src = Image.open(fp).convert('RGBA')
     _, _, _, am = src.split()
     
     ext = AlphaExpand.expand(src, cfg)
     rr, rg, rb, _ = ext.split()
     dst = Image.merge("RGBA", (rr, rg, rb, am))
-    dst.save(fp.parent / (fp.stem + "_expand.png"))
+    if overwrite:
+        dst.save(fp)
+    else:
+        dst.save(fp.parent / (fp.stem + "_expand.png"))
 
     if cfg.save_tmp:
         ext.save(fp.parent / (fp.stem + "_expand_t1.png"))
@@ -52,9 +56,11 @@ def main():
         elif s == '--saveTmp':
             cfg.save_tmp = True
 
+    overwrite = '--overwrite' in options
+
     op = FilesOperator.from_strs(files)
     for s in op.iterate():
-        exec_img(s, cfg)
+        exec_img(s, cfg, overwrite)
 
 if __name__ == "__main__":
     main()
