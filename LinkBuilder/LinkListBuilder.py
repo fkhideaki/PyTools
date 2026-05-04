@@ -20,9 +20,11 @@
 
 
 import argparse
-from dataclasses import dataclass
+import shutil
 import sys
+import re
 import math
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from html import escape
@@ -112,6 +114,8 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
             continue
         if item.name in ['index.html', 'index.php', '_download.php', '_count.json']:
             continue
+        if re.match(r'index_[0-9]+\.(html|php)', item.name):
+            continue
         stat = item.stat()
         entries.append({
             'name': item.name,
@@ -122,47 +126,51 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
 
     entries.sort(key=lambda e: e["name"].lower())
 
+    php_mode = cfg.php_mode
     use_desc = cfg.show_desc
     use_size_bytes = cfg.show_size
     use_modified = cfg.show_modified
     use_download = cfg.enable_action
-    download_link = cfg.download_link
-    if not entries:
-        rows_html = '<tr><td colspan="4" class="empty-msg">ファイルが見つかりません</td></tr>'
-    else:
-        rows_html = ""
+
+    page_config = f'''\
+const page_cfg = {{
+  use_desc: "{cfg.show_desc}",
+  use_size_bytes: "{cfg.show_size}",
+  use_modified: "{cfg.show_modified}",
+  use_download: "{cfg.enable_action}",
+  download_link: "{cfg.download_link}"
+}};'''
+
+    table_script = 'const file_items = [\n'
+    if entries:
         for e in entries:
             name = e['name']
             name_esc = escape(name)
-            name_lower = escape(name.lower())
+            data_name = escape(name.lower())
             size_bytes = e['size_bytes']
-            size = format_size(size_bytes)
+            size_disp = format_size(size_bytes)
             icon = e['icon']
             mtime = e['mtime']
-            td_desc = '<td class="col-desc">##description##</td>'
-            td_size = f'<td class="col-size">{size}</td>'
-            td_date = f'<td class="col-date">{mtime}</td>'
-            if cfg.php_mode:
-                download_url = f'_download.php?file={name_esc}'
+            desc = '##description##'
+            if php_mode:
+                url = f'_download.php?file={name_esc}'
             else:
-                download_url = name_esc
-            td_act = f'<td class="col-action"><a href="{download_url}" class="btn-dl" download title="ダウンロード">↓</a></td>'
-            rows_html += f"""\
-          <tr class="entry-row" data-name="{name_lower}" data-size="{size_bytes}">
-            <td class="col-icon">{icon}</td>
-            <td class="col-name">
-              <a href="{download_url}" class="file-link" {'download' if download_link else ''}>{name_esc}</a>
-            </td>
-            {td_desc if use_desc else ''}
-            {td_size if use_size_bytes else ''}
-            {td_date if use_modified else ''}
-            {td_act if use_download else ''}
-          </tr>
-"""
+                url = name_esc
+            table_script += f'''\
+  {{
+    url: "{url}",
+    desc: "{desc}",
+    name: "{name_esc}",
+    data_name: "{data_name}",
+    size_disp: "{size_disp}",
+    size_bytes: "{size_bytes}",
+    mtime: "{mtime}",
+    icon: "{icon}"
+'''
+            table_script += "  },\n"
+    table_script += ']\n'
 
-    main_table = f'''\
-      <table id="file-table">
-        <thead>
+    table_head = f'''\
           <tr>
             <th class="col-icon"></th>
             <th class="col-name" data-col="name">Name</th>
@@ -171,63 +179,111 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
             {'<th class="col-date" data-col="date">Modified</th>' if use_modified else ''}
             {'<th class="col-action">Download</th>' if use_download else ''}
           </tr>
-        </thead>
-        <tbody id="file-body">
-{rows_html}
-        </tbody>
-      </table>
 '''
+
     sort_script = '' if not cfg.enable_sort else '''\
-  <script>
     // ── テーブルソート ────────────────────────────────────
     const tbody = document.getElementById('file-body');
     let sortCol = null;
     let sortAsc = true;
 
-    document.querySelectorAll('th[data-col]').forEach(th => {{
-      th.addEventListener('click', () => {{
+    document.querySelectorAll('th[data-col]').forEach(th => {
+      th.addEventListener('click', () => {
         const col = th.dataset.col;
-        if (sortCol === col) {{
+        if (sortCol === col) {
           sortAsc = !sortAsc;
-        }} else {{
+        } else {
           sortCol = col;
           sortAsc = true;
-        }}
+        }
         document.querySelectorAll('th').forEach(t => t.classList.remove('sort-asc', 'sort-desc'));
         th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
 
         const rowArr = Array.from(tbody.querySelectorAll('.entry-row'));
-        rowArr.sort((a, b) => {{
+        rowArr.sort((a, b) => {
           let av, bv;
-          if (col === 'name') {{
+          if (col === 'name') {
             av = a.dataset.name;
             bv = b.dataset.name;
             return sortAsc ? av.localeCompare(bv, 'ja') : bv.localeCompare(av, 'ja');
-          }} else if (col === 'size') {{
+          } else if (col === 'size') {
             av = parseInt(a.dataset.size) || 0;
             bv = parseInt(b.dataset.size) || 0;
             return sortAsc ? av - bv : bv - av;
-          }} else if (col === 'date') {{
+          } else if (col === 'date') {
             av = a.querySelector('.col-date')?.textContent || '';
             bv = b.querySelector('.col-date')?.textContent || '';
             return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-          }}
+          }
           return 0;
-        }});
+        });
         rowArr.forEach(r => tbody.appendChild(r));
-      }});
-    }});
-  </script>
+      });
+    });
 '''
 
-    return f"""\
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{title}</title>
-  <style>
+    table_build_script = '''\
+document.addEventListener("DOMContentLoaded", function() {
+  const doc = document;
+  const table = doc.getElementById('file-table');
+  const tbody = doc.getElementById('file-body');
+
+  const php_mode = page_cfg.php_mode == 'True';
+  const use_desc = page_cfg.use_desc == 'True';
+  const use_size_bytes = page_cfg.use_size_bytes == 'True';
+  const use_modified = page_cfg.use_modified == 'True';
+  const use_download = page_cfg.use_download == 'True';
+  const download_link = page_cfg.download_link == 'True';
+
+  const addElem = (parent, tag, cls, inner) => {
+    const t = doc.createElement(tag);
+    if (cls) {
+      t.className = cls;
+    }
+    if (inner) {
+      t.innerHTML = inner;
+    }
+    if (parent) {
+      parent.appendChild(t);
+    }
+    return t;
+  }
+
+  for (const e of file_items) {
+    const r = addElem(tbody, 'tr', 'entry-row');
+    r.dataset.name = `screenshot.py`;
+    r.dataset.size = e.size_bytes;
+
+    addElem(r, 'td', 'col-icon', e.icon);
+    const tda = addElem(r, 'td', 'col-name');
+    const link = addElem(tda, 'a', 'file-link');
+    link.href = e.url;
+    link.innerHTML = e.name;
+    if (download_link) {
+      link.setAttribute('download', e.name);
+    }
+
+    if (use_desc) {
+      addElem(r, 'td', 'col-desc', e.desc);
+    }
+    if (use_size_bytes) {
+      addElem(r, 'td', 'col-size', e.size_disp);
+    }
+    if (use_modified) {
+      addElem(r, 'td', 'col-date', e.mtime);
+    }
+    if (use_download) {
+      const act = addElem(r, 'td', 'col-action');
+      const aa = addElem(act, 'a', 'btn-dl');
+      aa.title = 'ダウンロード';
+      aa.innerHTML = '↓';
+      aa.href = e.url;
+      aa.setAttribute('download', e.name);
+    }
+  }
+});'''
+
+    style = f'''\
     /* ─── Reset & Base ─────────────────────────────────── */
     *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
@@ -394,6 +450,17 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
       padding: 3rem !important;
       font-style: italic;
     }}
+'''
+
+    return f"""\
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+  <style>
+{style}
   </style>
 </head>
 <body>
@@ -411,10 +478,29 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
 
     <!-- テーブル -->
     <div class="table-wrap">
-{main_table}
+      <table id="file-table">
+        <thead>
+{table_head}
+        </thead>
+        <tbody id="file-body">
+        </tbody>
+      </table>
     </div>
   </div>
+
+<script>
 {sort_script}
+</script>
+
+<script>
+{page_config}
+{table_script}
+</script>
+
+<script>
+{table_build_script}
+</script>
+
 </body>
 </html>
 """
@@ -492,18 +578,38 @@ execDownload();
 '''
 
 
+def make_backup(folder: Path, suffix: str):
+    out = folder / ('index' + suffix)
+    if not out.exists():
+        return
+
+    idx = 1
+    while True:
+        idx += 1
+        back = folder / (f'index_{idx}' + suffix)
+        if back.exists():
+            continue
+        shutil.copy2(out, back)
+        break
+
 def generate_main(folder, title, cfg):
     html = generate_html(folder, title, cfg)
 
     if cfg.php_mode:
-        (folder / "index.php").write_text(html, encoding="utf-8")
+        suffix = '.php'
+    else:
+        suffix = '.html'
+    output_path = folder / ('index' + suffix)
+    make_backup(folder, suffix)
+
+    if cfg.php_mode:
+        output_path.write_text(html, encoding="utf-8")
         dl_api = folder / "_download.php"
         dl_api.write_text(download_api, encoding="utf-8")
         count = folder / "_counts.json"
         if not count.exists():
             count.write_text('{}', encoding="utf-8")
     else:
-        output_path = folder / "index.html"
         output_path.write_text(html, encoding="utf-8")
 
 
