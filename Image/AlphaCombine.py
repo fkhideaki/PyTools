@@ -26,7 +26,9 @@ from lib.ImageUT import Alphamap
 
 
 def exec_img(img_path: Path, alphamap_path: Path):
-    img = Image.open(img_path).convert("RGBA")
+    src = Image.open(img_path)
+    src_dpi = src.info.get('dpi')
+    img = src.convert("RGBA")
     alphamap = Image.open(alphamap_path).convert("RGBA")
 
     result_img = Alphamap.combine(img, alphamap)
@@ -35,7 +37,7 @@ def exec_img(img_path: Path, alphamap_path: Path):
 
     base_stem = img_path.parent / img_path.stem
     output_path = f"{base_stem}_out.png"
-    result_img.save(output_path)
+    result_img.save(output_path, dpi=src_dpi)
 
 def main():
     if len(sys.argv) != 3:

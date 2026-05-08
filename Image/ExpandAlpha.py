@@ -22,21 +22,23 @@ from lib.ImageUT import AlphaExpand, AlphaExpandCfg, FilesOperator
 
 
 def exec_img(fp, cfg: AlphaExpandCfg, overwrite):
-    src = Image.open(fp).convert('RGBA')
-    _, _, _, am = src.split()
+    src = Image.open(fp)
+    src_dpi = src.info.get('dpi')
+    srcC = src.convert('RGBA')
+    _, _, _, am = srcC.split()
     
-    ext = AlphaExpand.expand(src, cfg)
+    ext = AlphaExpand.expand(srcC, cfg)
     rr, rg, rb, _ = ext.split()
     dst = Image.merge("RGBA", (rr, rg, rb, am))
     if overwrite:
-        dst.save(fp)
+        dst.save(fp, dpi=src_dpi)
     else:
-        dst.save(fp.parent / (fp.stem + "_expand.png"))
+        dst.save(fp.parent / (fp.stem + "_expand.png"), dpi=src_dpi)
 
     if cfg.save_tmp:
-        ext.save(fp.parent / (fp.stem + "_expand_t1.png"))
+        ext.save(fp.parent / (fp.stem + "_expand_t1.png"), dpi=src_dpi)
         ext_rgb = Image.merge("RGB", (rr, rg, rb))
-        ext_rgb.save(fp.parent / (fp.stem + "_expand_t2.png"))
+        ext_rgb.save(fp.parent / (fp.stem + "_expand_t2.png"), dpi=src_dpi)
 
 def main():
     options: list[str] = []

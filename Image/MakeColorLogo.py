@@ -27,10 +27,7 @@ from PIL import Image
 import numpy as np
 
 
-def make_logo(logo_path: Path, color_path: Path):
-    color_img = Image.open(color_path)
-    logo_img = Image.open(logo_path)
-
+def make_logo(color_img, logo_img):
     ary_col = np.array(color_img)
     ary_a = np.array(logo_img)
 
@@ -42,10 +39,13 @@ def make_logo(logo_path: Path, color_path: Path):
     return result_img
 
 def exec_img(logo_path: Path, color_path: Path):
-    result_img = make_logo(logo_path, color_path)
+    color_img = Image.open(color_path)
+    logo_img = Image.open(logo_path)
+    src_dpi = logo_img.info.get('dpi')
+    result_img = make_logo(color_img, logo_img)
 
     output_path = logo_path.parent / f"{logo_path.stem}_{color_path.stem}.png"
-    result_img.save(output_path)
+    result_img.save(output_path, dpi=src_dpi)
     print(f"Saved {output_path}")
 
 def main():

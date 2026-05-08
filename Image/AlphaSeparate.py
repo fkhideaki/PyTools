@@ -21,13 +21,15 @@ from lib.ImageUT import Alphamap
 
 
 def exec_img(img_path: Path):
-    img = Image.open(img_path).convert("RGBA")
+    src = Image.open(img_path)
+    src_dpi = src.info.get('dpi')
+    img = src.convert("RGBA")
 
     color_img, alpha_img = Alphamap.separate(img)
 
     base = img_path.parent / img_path.stem
-    color_img.save(f"{base}_c.png")
-    alpha_img.save(f"{base}_a.png")
+    color_img.save(f"{base}_c.png", dpi=src_dpi)
+    alpha_img.save(f"{base}_a.png", dpi=src_dpi)
 
 
 def main():
