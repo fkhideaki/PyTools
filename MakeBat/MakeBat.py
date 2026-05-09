@@ -34,7 +34,7 @@ class Cfg:
 def contents(py: Path, cfg: Cfg, args: list[str]):
     arg = ' '.join([f'"{s}"' for s in args])
     if cfg.cd:
-        yield f'cd "{py.parent}"'
+        yield f'cd /d "%~dp0"'
         yield f'"{cfg.py_cmd}" "{py.name}" {arg} %*'
     else:
         yield f'"{cfg.py_cmd}" "{py.resolve()}" {arg} %*'
