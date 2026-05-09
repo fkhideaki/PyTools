@@ -30,10 +30,9 @@ class Cfg:
     py_cmd: str = ''
     cd: bool = False
     pause: bool = False
-    arg_files: bool = False
 
-def make_bat(py: Path, cfg: Cfg, arg_files: list[str]):
-    arg = ' '.join([f'"{s}"' for s in arg_files])
+def contents(py: Path, cfg: Cfg, args: list[str]):
+    arg = ' '.join([f'"{s}"' for s in args])
     if cfg.cd:
         yield f'cd "{py.parent}"'
         yield f'"{cfg.py_cmd}" "{py.name}" {arg} %*'
@@ -41,6 +40,13 @@ def make_bat(py: Path, cfg: Cfg, arg_files: list[str]):
         yield f'"{cfg.py_cmd}" "{py.resolve()}" {arg} %*'
     if cfg.pause:
         yield 'pause'
+
+def make_bat(cfg, py, args):
+    p = Path(py)
+    bn = p.parent / (p.stem + '.bat')
+    with open(bn, mode='w') as f:
+        for s in contents(p, cfg, args):
+            f.write(s + '\n')
 
 def main():
     options = []
@@ -52,34 +58,27 @@ def main():
             files.append(s)
 
     cfg = Cfg()
-    cfg.py_cmd = 'py'
-    for s in options:
-        if s == '--cd':
-            cfg.cd = True
-        elif s == '--self':
-            files = [__file__]
-        elif s == '--cmd_full':
-            cfg.py_cmd = sys.executable
-        elif s == '--pause':
-            cfg.pause = True
-        elif s == '--arg_files':
-            cfg.arg_files = True
+    cfg.cd = '--cd' in options
+    cfg.pause = '--pause' in options
 
-    if cfg.arg_files:
-        if not files:
-            return
-        py = Path(files[0])
-        bn = py.parent / (py.stem + '.bat')
-        with open(bn, mode='w') as f:
-            for s in make_bat(py, cfg, files[1:]):
-                f.write(s + '\n')
+    arg_files = '--arg_files' in options
+    make_self = '--self' in options
+    cmd_full = '--cmd_full' in options
+
+    if cmd_full:
+        cfg.py_cmd = sys.executable
     else:
-        for a in files:
-            py = Path(a)
-            bn = py.parent / (py.stem + '.bat')
-            with open(bn, mode='w') as f:
-                for s in make_bat(py, cfg, []):
-                    f.write(s + '\n')
+        cfg.py_cmd = 'py'
+
+    if make_self:
+        files = [__file__]
+
+    if arg_files:
+        if files:
+            make_bat(cfg, files[0], files[1:])
+    else:
+        for f in files:
+            make_bat(cfg, f, [])
 
 if __name__ == "__main__":
     main()
