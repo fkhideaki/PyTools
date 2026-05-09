@@ -20,11 +20,12 @@
 
 
 import argparse
+import json
 import shutil
 import sys
 import re
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from html import escape
@@ -92,6 +93,53 @@ class Config:
     show_desc: bool = False
 
 
+@dataclass
+class FileDesc:
+    name: str = ''
+    desc: str = ''
+
+
+class FileTable:
+    def __init__(self, folder: Path):
+        self.folder: Path = folder
+        self.file_path = folder / "_filelist.json"
+        self.files: list[FileDesc] = []
+
+    def read(self):
+        self.files = []
+        if not self.file_path.exists():
+            return
+        with open(self.file_path, encoding="utf-8") as f:
+            data = json.load(f)
+            self.files = [FileDesc(**d) for d in data]
+
+    def write(self):
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            json.dump([asdict(p) for p in self.files], f, ensure_ascii=False, indent=2)
+
+    def apply(self, cur_list):
+        prev = [e for e in self.files]
+        l0 = []
+        for fd in prev:
+            f = [i for i in cur_list if i['name'] == fd.name]
+            if f:
+                e = f[0]
+                e['desc'] = fd.desc
+                l0.append(e)
+        l1 = []
+        for e in cur_list:
+            name = e['name']
+            f = [i for i in prev if i.name == name]
+            if not f:
+                l1.append(e)
+                nf = FileDesc()
+                nf.name = name
+                nf.desc = e['desc']
+                self.files.append(nf)
+        w = l0 + l1
+        return w
+
+
 def format_size(size_bytes: int) -> str:
     """バイト数を人間が読みやすい形式に変換"""
     if size_bytes == 0:
@@ -126,9 +174,15 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
             'icon': get_icon(item),
             'size_bytes': stat.st_size,
             'mtime': format_mtime(stat.st_mtime),
+            'desc': '##description##',
         })
 
     entries.sort(key=lambda e: e["name"].lower())
+
+    file_table = FileTable(folder)
+    file_table.read()
+    entries = file_table.apply(entries)
+    file_table.write()
 
     php_mode = cfg.php_mode
     use_desc = cfg.show_desc
@@ -146,21 +200,20 @@ const page_cfg = {{
 }};'''
 
     table_script = 'const file_items = [\n'
-    if entries:
-        for e in entries:
-            name = e['name']
-            name_esc = escape(name)
-            data_name = escape(name.lower())
-            size_bytes = e['size_bytes']
-            size_disp = format_size(size_bytes)
-            icon = e['icon']
-            mtime = e['mtime']
-            desc = '##description##'
-            if php_mode:
-                url = f'_download.php?file={name_esc}'
-            else:
-                url = name_esc
-            table_script += f'''\
+    for e in entries:
+        name = e['name']
+        name_esc = escape(name)
+        data_name = escape(name.lower())
+        size_bytes = e['size_bytes']
+        size_disp = format_size(size_bytes)
+        icon = e['icon']
+        mtime = e['mtime']
+        desc = e['desc']
+        if php_mode:
+            url = f'_download.php?file={name_esc}'
+        else:
+            url = name_esc
+        table_script += f'''\
   {{
     url: "{url}",
     desc: "{desc}",
@@ -171,7 +224,7 @@ const page_cfg = {{
     mtime: "{mtime}",
     icon: "{icon}"
 '''
-            table_script += "  },\n"
+        table_script += "  },\n"
     table_script += ']\n'
 
     table_head = f'''\
