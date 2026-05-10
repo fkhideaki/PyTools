@@ -12,6 +12,8 @@
   - --abs
     - 対象ファイルをフルパスで指定する
     - 未指定時はカレントディレクトリをファイルの親フォルダに移動してファイル名でコマンドを起動
+  - --rel
+    - 対象ファイルを相対パスで指定する
   - --self
     - 自分自身のbatを作成する
   - --cmd_full
@@ -28,12 +30,15 @@ import sys
 @dataclass
 class Cfg:
     py_cmd: str = ''
+    rel_path: bool = False
     abs_path: bool = False
     pause: bool = False
 
 def contents(py: Path, cfg: Cfg, args: list[str]):
     arg = ' '.join([f'"{s}"' for s in args])
-    if cfg.abs_path:
+    if cfg.rel_path:
+        yield f'"{cfg.py_cmd}" "%~dp0{py.name}" {arg} %*'
+    elif cfg.abs_path:
         yield f'"{cfg.py_cmd}" "{py.resolve()}" {arg} %*'
     else:
         yield f'cd /d "%~dp0"'
@@ -58,6 +63,7 @@ def main():
             files.append(s)
 
     cfg = Cfg()
+    cfg.rel_path = '--rel' in options
     cfg.abs_path = '--abs' in options
     cfg.pause = '--pause' in options
 
