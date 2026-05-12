@@ -164,7 +164,7 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
     for item in sorted(folder.iterdir()):
         if not item.is_file():
             continue
-        if item.name in ['index.html', 'index.php', '_download.php', '_count.json']:
+        if item.name in ['index.html', 'index.php', '_download.php', '_count.json', '_filelist.json']:
             continue
         if re.match(r'index_[0-9]+\.(html|php)', item.name):
             continue
