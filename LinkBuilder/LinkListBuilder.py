@@ -84,6 +84,7 @@ def get_icon(path: Path) -> str:
 
 @dataclass
 class Config:
+    title: str = ''
     php_mode: bool = False
     download_link: bool = False
     enable_action: bool = False
@@ -91,6 +92,18 @@ class Config:
     show_modified: bool = False
     show_size: bool = False
     show_desc: bool = False
+
+    def read(self):
+        self.files = []
+        if not self.file_path.exists():
+            return
+        with open(self.file_path, encoding="utf-8") as f:
+            data = json.load(f)
+            self.files = [Config(**d) for d in data]
+
+    def write(self):
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            json.dump([asdict(p) for p in self.files], f, ensure_ascii=False, indent=2)
 
 
 @dataclass
@@ -100,21 +113,19 @@ class FileDesc:
 
 
 class FileTable:
-    def __init__(self, folder: Path):
-        self.folder: Path = folder
-        self.file_path = folder / "_filelist.json"
+    def __init__(self):
         self.files: list[FileDesc] = []
 
-    def read(self):
+    def read(self, file_path: Path):
         self.files = []
-        if not self.file_path.exists():
+        if not file_path.exists():
             return
-        with open(self.file_path, encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
             self.files = [FileDesc(**d) for d in data]
 
-    def write(self):
-        with open(self.file_path, "w", encoding="utf-8") as f:
+    def write(self, file_path: Path):
+        with open(file_path, "w", encoding="utf-8") as f:
             json.dump([asdict(p) for p in self.files], f, ensure_ascii=False, indent=2)
 
     def apply(self, cur_list):
@@ -157,19 +168,22 @@ def format_mtime(mtime: float) -> str:
     """更新日時をフォーマット"""
     return datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
 
-def generate_html(folder: Path, title: str, cfg: Config) -> str:
-    """index.html の内容を生成"""
-
-    entries = []
+def search_items(folder):
+    file_items = []
     for item in sorted(folder.iterdir()):
         if not item.is_file():
             continue
-        if item.name in ['index.html', 'index.php', '_download.php', '_count.json', '_filelist.json']:
+        if item.name in [
+            'index.html',
+            'index.php',
+            '_download.php',
+            '_count.json',
+            '_filelist.json']:
             continue
         if re.match(r'index_[0-9]+\.(html|php)', item.name):
             continue
         stat = item.stat()
-        entries.append({
+        file_items.append({
             'name': item.name,
             'icon': get_icon(item),
             'size_bytes': stat.st_size,
@@ -177,12 +191,11 @@ def generate_html(folder: Path, title: str, cfg: Config) -> str:
             'desc': '##description##',
         })
 
-    entries.sort(key=lambda e: e["name"].lower())
+    file_items.sort(key=lambda e: e["name"].lower())
+    return file_items
 
-    file_table = FileTable(folder)
-    file_table.read()
-    entries = file_table.apply(entries)
-    file_table.write()
+def generate_html(file_items, cfg: Config) -> str:
+    """index.html の内容を生成"""
 
     php_mode = cfg.php_mode
     use_desc = cfg.show_desc
@@ -200,7 +213,7 @@ const page_cfg = {{
 }};'''
 
     table_script = 'const file_items = [\n'
-    for e in entries:
+    for e in file_items:
         name = e['name']
         name_esc = escape(name)
         data_name = escape(name.lower())
@@ -515,7 +528,7 @@ document.addEventListener("DOMContentLoaded", function() {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{title}</title>
+  <title>{cfg.title}</title>
   <style>
 {style}
   </style>
@@ -528,7 +541,7 @@ document.addEventListener("DOMContentLoaded", function() {
       <div class="header-top">
         <div class="folder-badge">📂</div>
         <div class="header-text">
-          <h1>{title}</h1>
+          <h1>{cfg.title}</h1>
         </div>
       </div>
     </header>
@@ -649,21 +662,29 @@ def make_backup(folder: Path, suffix: str):
         shutil.copy2(out, back)
         break
 
-def generate_main(folder, title, cfg):
-    html = generate_html(folder, title, cfg)
+def generate_main(folder_path: Path, cfg: Config):
+    file_items = search_items(folder_path)
+
+    listfile = folder_path / '_filelist.json'
+    file_table = FileTable()
+    file_table.read(listfile)
+    file_items = file_table.apply(file_items)
+    file_table.write(listfile)
+
+    html = generate_html(file_items, cfg)
 
     if cfg.php_mode:
         suffix = '.php'
     else:
         suffix = '.html'
-    output_path = folder / ('index' + suffix)
-    make_backup(folder, suffix)
+    output_path = folder_path / ('index' + suffix)
+    make_backup(folder_path, suffix)
 
     if cfg.php_mode:
         output_path.write_text(html, encoding="utf-8")
-        dl_api = folder / "_download.php"
+        dl_api = folder_path / "_download.php"
         dl_api.write_text(download_api, encoding="utf-8")
-        count = folder / "_counts.json"
+        count = folder_path / "_counts.json"
         if not count.exists():
             count.write_text('{}', encoding="utf-8")
     else:
@@ -752,6 +773,7 @@ def main():
         title = '##TITLE##'
 
     cfg = Config()
+    cfg.title = title
     cfg.php_mode = args.php
     cfg.download_link = args.download
     cfg.enable_action = args.action
@@ -760,7 +782,7 @@ def main():
     cfg.show_size = args.size
     cfg.show_desc = args.desc
 
-    generate_main(folder, title, cfg)
+    generate_main(folder, cfg)
 
 
 if __name__ == "__main__":
