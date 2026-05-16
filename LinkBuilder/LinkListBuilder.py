@@ -3,7 +3,7 @@
 - フォルダ内のファイル一覧HTMLを生成するスクリプト
 
 ## 使い方
-- python DownloadLinkBuilder.py <フォルダパス>
+- python DownloadLinkBuilder.py <フォルダパス> <options>
 
 ## options
 - --gui : GUIモードで実行
@@ -29,7 +29,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from html import escape
-from typing import Optional
+from typing import Optional, Self
 
 
 import tkinter as tk
@@ -93,17 +93,17 @@ class Config:
     show_size: bool = False
     show_desc: bool = False
 
-    def read(self):
-        self.files = []
-        if not self.file_path.exists():
-            return
-        with open(self.file_path, encoding="utf-8") as f:
+    @classmethod
+    def read(cls, file_path: Path) -> Self | None:
+        if not file_path.exists():
+            return None
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
-            self.files = [Config(**d) for d in data]
+            return Config(**data)
 
-    def write(self):
-        with open(self.file_path, "w", encoding="utf-8") as f:
-            json.dump([asdict(p) for p in self.files], f, ensure_ascii=False, indent=2)
+    def write(self, file_path: Path):
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(asdict(self), f, ensure_ascii=False, indent=2)
 
 
 @dataclass
@@ -178,6 +178,7 @@ def search_items(folder):
             'index.php',
             '_download.php',
             '_count.json',
+            '_config.json',
             '_filelist.json']:
             continue
         if re.match(r'index_[0-9]+\.(html|php)', item.name):
@@ -663,6 +664,11 @@ def make_backup(folder: Path, suffix: str):
         break
 
 def generate_main(folder_path: Path, cfg: Config):
+    cfgfile = folder_path / '_config.json'
+    if cfgfile.is_file():
+        cfg = Config.read(cfgfile)
+    else:
+        cfg.write(cfgfile)
     file_items = search_items(folder_path)
 
     listfile = folder_path / '_filelist.json'
