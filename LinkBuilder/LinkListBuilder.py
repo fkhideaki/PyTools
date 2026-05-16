@@ -472,12 +472,41 @@ document.addEventListener("DOMContentLoaded", function() {
       vertical-align: middle;
     }}
 
-    .col-icon   {{ width: 2rem; font-size: 1.1rem; padding-right: 0; }}
-    .col-name   {{ max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-    .col-desc   {{ width: 12rem; color: var(--muted); font-size: 0.85rem; }}
-    .col-size   {{ width: 7rem; text-align: center; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }}
-    .col-date   {{ width: 11rem; text-align: center; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }}
-    .col-action {{ width: 3rem; text-align: center; }}
+    .col-icon {{
+      width: 2rem;
+      font-size: 1.1rem;
+      padding-right: 0;
+    }}
+    .col-name {{
+      max-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .col-desc {{
+      width: 14rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }}
+    .col-size {{
+      width: 7rem;
+      text-align: center;
+      color: var(--muted);
+      font-family:
+      var(--font-mono);
+      font-size: 0.78rem;
+    }}
+    .col-date {{
+      width: 11rem;
+      text-align: center;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }}
+    .col-action {{
+      width: 3rem;
+      text-align: center;
+    }}
 
     @media (max-width: 600px) {{
       .col-date {{ display: none; }}
