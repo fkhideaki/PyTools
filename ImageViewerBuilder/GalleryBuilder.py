@@ -11,6 +11,9 @@
     - 拡大画面をホイールでページ送りする機能を有効にする
   - --swipe
     - スマホ時にswipeでページ送りする機能を有効にする
+
+## 一括ダウンロード機能
+- 指定フォルダに一つだけzipファイルがある場合、そのファイルを一括ダウンロード用としてリンクを作成する
 """
 
 from dataclasses import dataclass
@@ -22,6 +25,7 @@ from typing import List
 class Cfg:
     swipe: bool = False
     wheel: bool = False
+    zip_file: str = ''
 
 def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
     folder_name = folder_path.name
@@ -52,8 +56,40 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
         h1 {{
             text-align: center;
             color: #333;
-            margin-bottom: 30px;
+            margin-bottom: 16px;
             font-size: 2em;
+        }}
+        
+        .download-bar {{
+            text-align: center;
+            margin-bottom: 30px;
+        }}
+
+        .download-bar a {{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 20px;
+            background: #4a90d9;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-weight: 500;
+            transition: background 0.2s, transform 0.1s;
+        }}
+
+        .download-bar a:hover {{
+            background: #2f72b8;
+            transform: translateY(-1px);
+        }}
+
+        .download-bar a:active {{
+            transform: translateY(0);
+        }}
+
+        .download-bar a svg {{
+            flex-shrink: 0;
         }}
         
         .gallery {{
@@ -229,10 +265,36 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
 </head>
 """
 
+    zip_file = cfg.zip_file
+    if not zip_file:
+        download_link = ''
+    else:
+        download_link = f'''\
+    <div class="download-bar">
+        <a href="{zip_file}" download>
+            <svg xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            すべてダウンロード
+        </a>
+    </div>
+'''
+
     html_template += f"""\
 <body>
     <h1>{folder_name}</h1>
 
+{download_link}
     <div class="gallery">
     </div>
 """
@@ -410,11 +472,8 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
     return html_template
 
 
-def getImages(folder: Path) -> list[str]:
+def get_images(folder: Path) -> list[str]:
     extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'}
-
-    if not folder.exists() or not folder.is_dir():
-        raise ValueError(f"指定されたパスはフォルダではありません: {folder}")
 
     images = []
     for file in sorted(folder.iterdir()):
@@ -425,12 +484,27 @@ def getImages(folder: Path) -> list[str]:
     
     return images
 
+def get_zip(folder: Path) -> str:
+    z = ''
+    for file in folder.iterdir():
+        if not file.is_file():
+            continue
+        if file.suffix.lower() == '.zip':
+            if z:
+                return ''
+            z = file.name
+    
+    return z
+
 def buildMain(folder: Path, opt: List[str]):
     if not folder.is_dir():
         print(f'{folder} is not folder')
         return
 
-    images = getImages(folder)
+    if not folder.exists() or not folder.is_dir():
+        raise ValueError(f"指定されたパスはフォルダではありません: {folder}")
+
+    images = get_images(folder)
     if not images:
         print(f"{folder} に画像ファイルが見つかりませんでした")
         return
@@ -438,6 +512,7 @@ def buildMain(folder: Path, opt: List[str]):
     cfg = Cfg()
     cfg.wheel = '--wheel' in opt
     cfg.swipe = '--swipe' in opt
+    cfg.zip_file = get_zip(folder)
     html = generatePage(folder, images, cfg)
 
     outFN = folder / "index.html"
