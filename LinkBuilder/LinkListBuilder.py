@@ -773,8 +773,8 @@ def gui_mode():
             show_size=size_var.get(),
             show_desc=desc_var.get()
         )
-        title = title_entry.get() or "##TITLE##"
-        generate_main(folder, title, cfg)
+        cfg.title = title_entry.get() or "##TITLE##"
+        generate_main(folder, cfg)
     root.drop_target_register(tkdnd.DND_FILES)
     root.dnd_bind('<<Drop>>', on_drop)
     root.mainloop()
