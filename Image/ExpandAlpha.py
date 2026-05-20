@@ -22,6 +22,7 @@ from lib.ImageUT import AlphaExpand, AlphaExpandCfg, FilesOperator
 
 
 def exec_img(fp, cfg: AlphaExpandCfg, overwrite):
+    print(fp)
     src = Image.open(fp)
     src_dpi = src.info.get('dpi')
     srcC = src.convert('RGBA')
