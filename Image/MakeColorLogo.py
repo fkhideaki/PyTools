@@ -6,7 +6,7 @@
 - 指定画像の形状維持で、カラーだけを指定色に変更したデータを出力する
 
 ## 使い方
-- python MakeColorLogo.py [ロゴ画像] [色指定画像]
+- python MakeColorLogo.py [ロゴ画像] [色指定画像(複数指定可)]
 - 例
   - MakeColorLogo.py base.png c0.png
     - base.pngと同サイズ、アルファ値一致で、色が全ピクセルc0.pngの画像を  
@@ -49,13 +49,13 @@ def exec_img(logo_path: Path, color_path: Path):
     print(f"Saved {output_path}")
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 3:
         print("Usage: python MakeColorLogo.py [logo_image] [color_image]")
         return
 
     logo_path = Path(sys.argv[1])
-    color_path = Path(sys.argv[2])
-    exec_img(logo_path, color_path)
+    for col in sys.argv[2:]:
+        exec_img(logo_path, Path(col))
 
 if __name__ == "__main__":
     main()
