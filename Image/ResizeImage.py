@@ -82,7 +82,7 @@ def main():
         elif s.startswith('--b:'):
             target_size.max_len = int(s.split(':')[1])
         elif s.startswith('--t:'):
-            cfg.outType = '.' + s.split(':')[1]
+            cfg.out_type = '.' + s.split(':')[1]
         elif s == '--repeat':
             resize_cfg.repeat = True
         elif s == '--separate':
