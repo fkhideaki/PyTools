@@ -168,7 +168,7 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
         }}
         
         .modal-content {{
-            max-width: min(90%, calc(100% - 24px - 90px));
+            max-width: min(95%, calc(100% - 10px));
             max-height: 90%;
             display: flex;
             align-items: center;
@@ -197,45 +197,60 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
             font-weight: bold;
             cursor: pointer;
             transition: color 0.2s;
-            z-index: 1001;
+            z-index: 1002;
         }}
         
         .close:hover {{
             color: #bbb;
         }}
         
-        .nav-button {{
+        .nav-zone {{
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 25%;
+            z-index: 1001;
+            cursor: pointer;
+        }}
+
+        .nav-zone.prev {{
+            left: 0;
+        }}
+
+        .nav-zone.next {{
+            right: 0;
+        }}
+
+        .nav-zone-arrow {{
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
             color: #fff;
             font-size: 30px;
             font-weight: bold;
-            cursor: pointer;
-            background: rgba(200,200,200,0.3);
+            background: rgba(200,200,200,0.25);
             width: 45px;
             height: 45px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 22px;
-            transition: all 0.2s;
+            opacity: 0;
+            transition: opacity 0.2s;
             user-select: none;
-            z-index: 1001;
             line-height: 1;
         }}
-        
-        .nav-button.prev {{
+
+        .nav-zone.prev .nav-zone-arrow {{
             left: 10px;
         }}
-        
-        .nav-button.next {{
+
+        .nav-zone.next .nav-zone-arrow {{
             right: 10px;
         }}
-        
-        .nav-button:hover {{
-            background: rgba(200,200,200,0.9);
-            transform: translateY(-50%) scale(1.1);
+
+        .nav-zone:hover .nav-zone-arrow {{
+            opacity: 1;
         }}
         
         .modal-filename {{
@@ -456,8 +471,12 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
     <!-- モーダル -->
     <div id="modal" class="modal" onclick="closeModal()">
         <span class="close" onclick="closeModal()">&times;</span>
-        <div class="nav-button prev" onclick="event.stopPropagation(); prevImage()">＜</div>
-        <div class="nav-button next" onclick="event.stopPropagation(); nextImage()">＞</div>
+        <div class="nav-zone prev" onclick="event.stopPropagation(); prevImage()">
+            <div class="nav-zone-arrow">＜</div>
+        </div>
+        <div class="nav-zone next" onclick="event.stopPropagation(); nextImage()">
+            <div class="nav-zone-arrow">＞</div>
+        </div>
         <div class="modal-content">
             <img id="modal-img" src="" alt="">
         </div>
