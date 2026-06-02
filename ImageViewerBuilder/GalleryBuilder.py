@@ -208,7 +208,7 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
             position: absolute;
             top: 0;
             height: 100%;
-            width: 25%;
+            width: 15%;
             z-index: 1001;
             cursor: pointer;
         }}
