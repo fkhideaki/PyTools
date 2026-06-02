@@ -169,7 +169,7 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
         
         .modal-content {{
             max-width: min(95%, calc(100% - 10px));
-            max-height: 90%;
+            max-height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -183,7 +183,7 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
         
         .modal-content img {{
             max-width: 100%;
-            max-height: 80vh;
+            max-height: 90vh;
             object-fit: contain;
             display: block;
         }}
