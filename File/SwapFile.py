@@ -103,7 +103,7 @@ def swapFileClip():
     swapFile(f0, f1)
 
 def main():
-    if len(sys.argv) == 1:
+    if len(sys.argv) == 2:
         if sys.argv[1] == '--clip':
             swapFileClip()
             return
