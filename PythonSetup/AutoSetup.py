@@ -4,8 +4,8 @@ pythonの仮想環境のセットアップスクリプト
 '''
 
 import os
+from pathlib import Path
 import subprocess
-import sys
 import venv
 
 VENV_DIR = ".venv"
@@ -32,7 +32,7 @@ def upgrade_pip(venv_python):
     """pipを最新版にアップグレード"""
     print("pipをアップグレード中...")
     subprocess.run(
-        [venv_python, "-m", "pip", "install", "--upgrade", "pip"],
+        [venv_python, "-m", "ensurepip", "--upgrade"],
         check=True
     )
 
@@ -50,8 +50,18 @@ def main():
     ensure_venv()
     venv_python = get_venv_python()
 
-    upgrade_pip(venv_python)
-    install_requirements(venv_python)
+    try:
+        upgrade_pip(venv_python)
+    except Exception as e:
+        print('Failed upgrade pip')
+        return
+
+    if Path('requirements.txt').is_file():
+        try:
+            install_requirements(venv_python)
+        except Exception as e:
+            print('Failed install requirements')
+            return
 
     print("セットアップ完了")
 
