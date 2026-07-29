@@ -11,17 +11,17 @@ import venv
 VENV_DIR = ".venv"
 
 
-def get_venv_python():
+def get_venv_python() -> Path:
     """venv内のpython実行パスをOSに応じて返す"""
     if os.name == "nt":  # Windows
-        return os.path.join(VENV_DIR, "Scripts", "python.exe")
+        return Path(VENV_DIR) / "Scripts" / "python.exe"
     else:  # macOS/Linux
-        return os.path.join(VENV_DIR, "bin", "python")
+        return Path(VENV_DIR) / "bin" / "python"
 
 
 def ensure_venv():
     """venvが存在すればそれを使い、なければ新規作成する"""
-    if os.path.exists(VENV_DIR) and os.path.exists(get_venv_python()):
+    if Path(VENV_DIR).exists() and get_venv_python().exists():
         print(f"既存の仮想環境を使用します: {VENV_DIR}")
     else:
         print("仮想環境を作成中...")
