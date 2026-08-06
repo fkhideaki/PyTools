@@ -189,6 +189,8 @@ def search_items(folder):
             continue
         if re.match(r'index_[0-9]+\.(html|php)', item.name):
             continue
+        if re.match(r'.*\.(bat)', item.name):
+            continue
         stat = item.stat()
         file_items.append({
             'name': item.name,
