@@ -16,6 +16,7 @@
 - --modified : 更新日時を表示
 - --size : サイズを表示
 - --desc : 説明を表示する列を追加
+- --make_bat : 更新用のバッチファイルを生成
 
 ## データの更新について
 - 一度実行するとその時に使用したファイルリスト、設定ファイルが出力される
@@ -98,6 +99,7 @@ class Config:
     show_modified: bool = False
     show_size: bool = False
     show_desc: bool = False
+    make_bat: bool = False
 
     @classmethod
     def read(cls, file_path: Path) -> Self | None:
@@ -733,6 +735,12 @@ def generate_main(folder_path: Path, cfg: Config):
     else:
         output_path.write_text(html, encoding="utf-8")
 
+    if cfg.make_bat:
+        bat_path = folder_path / "_update.bat"
+        if not bat_path.exists():
+            bat_content = f'py "{Path(__file__).resolve()}" "{folder_path}"\n'
+            bat_path.write_text(bat_content)
+
 
 def gui_mode():
     root = tkdnd.Tk()
@@ -753,6 +761,8 @@ def gui_mode():
     tk.Checkbutton(root, text="サイズ表示 (--size)", variable=size_var).pack(anchor='w', padx=20)
     desc_var = tk.BooleanVar()
     tk.Checkbutton(root, text="説明表示 (--desc)", variable=desc_var).pack(anchor='w', padx=20)
+    make_bat_var = tk.BooleanVar()
+    tk.Checkbutton(root, text="更新用バッチ生成 (--make_bat)", variable=make_bat_var).pack(anchor='w', padx=20)
 
     tk.Label(root, text="ページタイトル (--title)", font=("Arial", 12)).pack(pady=10)
     title_entry = tk.Entry(root, width=30)
@@ -773,7 +783,8 @@ def gui_mode():
             enable_sort=sort_var.get(),
             show_modified=modified_var.get(),
             show_size=size_var.get(),
-            show_desc=desc_var.get()
+            show_desc=desc_var.get(),
+            make_bat=make_bat_var.get()
         )
         cfg.title = title_entry.get() or "##TITLE##"
         generate_main(folder, cfg)
@@ -800,6 +811,7 @@ def main():
     parser.add_argument("--modified", action="store_true", help="更新日時を表示")
     parser.add_argument("--size", action="store_true", help="サイズを表示")
     parser.add_argument("--desc", action="store_true", help="説明を表示する列を追加")
+    parser.add_argument("--make_bat", action="store_true", help="更新用のバッチファイルを生成")
     args = parser.parse_args()
 
     if args.gui:
@@ -824,6 +836,7 @@ def main():
     cfg.show_modified = args.modified
     cfg.show_size = args.size
     cfg.show_desc = args.desc
+    cfg.make_bat = args.make_bat
 
     generate_main(folder, cfg)
 
