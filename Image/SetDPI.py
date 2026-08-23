@@ -8,10 +8,10 @@
 - python SetDPI.py -dpi 100 [画像]
   - 指定画像(複数可)のdpiを指定値に変更した画像を出力する
   - 出力画像は元ファイル名_outという形式で出力される(a.png->a_out.png)
-- python SetDPI.py -w 100mm [画像]
+- python SetDPI.py -w 100 [画像]
   - 指定画像の横幅が指定幅となるようにdpiを変更した画像を出力する
-  - 単位はcm、mmに対応
-- python SetDPI.py -h 100mm [画像]
+  - 単位はmm
+- python SetDPI.py -h 100 [画像]
   - 指定画像の高さが指定幅となるようにdpiを変更した画像を出力する
 '''
 
@@ -23,20 +23,6 @@ import sys
 from PIL import Image
 
 MM_PER_INCH = 25.4
-
-
-def parse_length_to_mm(length_str):
-    """'100mm' や '10cm' のような文字列をmm単位のfloatに変換する"""
-    m = re.fullmatch(r'\s*([0-9]*\.?[0-9]+)\s*(mm|cm)\s*', length_str, re.IGNORECASE)
-    if not m:
-        raise argparse.ArgumentTypeError(
-            f"'{length_str}' は正しい形式ではありません。例: 100mm, 10cm"
-        )
-    value = float(m.group(1))
-    unit = m.group(2).lower()
-    if unit == 'cm':
-        value *= 10.0
-    return value
 
 
 def make_out_path(path):
@@ -65,12 +51,10 @@ def process_image(path, args):
         if args.dpi is not None:
             dpi_value = args.dpi
         elif args.w is not None:
-            target_mm = parse_length_to_mm(args.w)
-            target_inch = target_mm / MM_PER_INCH
+            target_inch = float(args.w) / MM_PER_INCH
             dpi_value = width_px / target_inch
         else:  # args.h
-            target_mm = parse_length_to_mm(args.h)
-            target_inch = target_mm / MM_PER_INCH
+            target_inch = float(args.h) / MM_PER_INCH
             dpi_value = height_px / target_inch
 
         out_path = make_out_path(path)
