@@ -26,22 +26,34 @@
 from dataclasses import dataclass
 from pathlib import Path
 import sys
+from enum import Enum
+
+class PathMode(Enum):
+    '''パスの指定方法'''
+
+    # 相対パス
+    REL = 1
+
+    # 絶対パス
+    ABS = 2
+
+    # カレントディレクトリに移動してファイル名で指定
+    CUR = 3
 
 @dataclass
 class Cfg:
     py_cmd: str = ''
-    rel_path: bool = False
-    abs_path: bool = False
+    path_mode: PathMode = PathMode.CUR
     pause: bool = False
 
 def contents(py: Path, cfg: Cfg, args: list[str]):
     arg = ' '.join([f'"{s}"' for s in args])
     py_cmd = cfg.py_cmd
-    if cfg.rel_path:
+    if cfg.path_mode == PathMode.REL:
         yield f'"{py_cmd}" "%~dp0{py.name}" {arg} %*'
-    elif cfg.abs_path:
+    elif cfg.path_mode == PathMode.ABS:
         yield f'"{py_cmd}" "{py.resolve()}" {arg} %*'
-    else:
+    elif cfg.path_mode == PathMode.CUR:
         yield f'cd /d "%~dp0"'
         yield f'"{py_cmd}" "{py.name}" {arg} %*'
     if cfg.pause:
@@ -64,8 +76,13 @@ def main():
             files.append(s)
 
     cfg = Cfg()
-    cfg.rel_path = '--rel' in options
-    cfg.abs_path = '--abs' in options
+    if '--rel' in options:
+        cfg.path_mode = PathMode.REL
+    elif '--abs' in options:
+        cfg.path_mode = PathMode.ABS
+    else:
+        cfg.path_mode = PathMode.CUR
+
     cfg.pause = '--pause' in options
 
     arg_files = '--arg_files' in options
