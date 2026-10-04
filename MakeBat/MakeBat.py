@@ -5,7 +5,7 @@
 - pythonを起動するbatを作成する機能
 
 ## コマンド
-- python _MakeBat.py [files] [options]
+- python MakeBat.py [files] [options]
 - options:
   - --pause
     - 完了時に待機するバッチファイルを出力する
@@ -36,17 +36,18 @@ class Cfg:
 
 def contents(py: Path, cfg: Cfg, args: list[str]):
     arg = ' '.join([f'"{s}"' for s in args])
+    py_cmd = cfg.py_cmd
     if cfg.rel_path:
-        yield f'"{cfg.py_cmd}" "%~dp0{py.name}" {arg} %*'
+        yield f'"{py_cmd}" "%~dp0{py.name}" {arg} %*'
     elif cfg.abs_path:
-        yield f'"{cfg.py_cmd}" "{py.resolve()}" {arg} %*'
+        yield f'"{py_cmd}" "{py.resolve()}" {arg} %*'
     else:
         yield f'cd /d "%~dp0"'
-        yield f'"{cfg.py_cmd}" "{py.name}" {arg} %*'
+        yield f'"{py_cmd}" "{py.name}" {arg} %*'
     if cfg.pause:
         yield 'pause'
 
-def make_bat(cfg, py, args):
+def make_bat(cfg: Cfg, py: str, args: list[str]):
     p = Path(py)
     bn = p.parent / (p.stem + '.bat')
     with open(bn, mode='w') as f:
