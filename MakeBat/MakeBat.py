@@ -20,7 +20,7 @@
     - pythonの実行コマンドに現在のpythonのフルパスを指定
     - 未指定時にはpython launcherを使う
     - --venv
-        - 対象ファイルと同じフォルダに.venvが存在する場合、そのpythonで起動する
+      - 対象ファイルと同じフォルダに.venvが存在する場合、そのpythonで起動する
   - --arg_files
     - 1つ目の引数を対象のpythonファイルとし、2つ目以降をその引数としてbatを作成する
 '''
@@ -52,7 +52,7 @@ class Cfg:
 def contents(py: Path, cfg: Cfg, args: list[str]):
     arg = ' '.join([f'"{s}"' for s in args])
 
-    py_cmd = cfg.py_cmd
+    py_cmd = f'"{cfg.py_cmd}"'
     if cfg.venv:
         venv_python = (py.parent / '.venv' / 'Scripts' / 'python.exe').resolve()
         if venv_python.is_file():
@@ -61,15 +61,15 @@ def contents(py: Path, cfg: Cfg, args: list[str]):
             elif cfg.path_mode == PathMode.REL:
                 py_cmd = '%~dp0.venv\\Scripts\\python.exe'
             elif cfg.path_mode == PathMode.ABS:
-                py_cmd = f'{venv_python}'
+                py_cmd = f'"{venv_python}"'
 
     if cfg.path_mode == PathMode.REL:
-        yield f'"{py_cmd}" "%~dp0{py.name}" {arg} %*'
+        yield f'{py_cmd} "%~dp0{py.name}" {arg} %*'
     elif cfg.path_mode == PathMode.ABS:
-        yield f'"{py_cmd}" "{py.resolve()}" {arg} %*'
+        yield f'{py_cmd} "{py.resolve()}" {arg} %*'
     elif cfg.path_mode == PathMode.CUR:
         yield f'cd /d "%~dp0"'
-        yield f'"{py_cmd}" "{py.name}" {arg} %*'
+        yield f'{py_cmd} "{py.name}" {arg} %*'
 
     if cfg.pause:
         yield 'pause'
