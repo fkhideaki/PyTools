@@ -19,8 +19,9 @@
   - --cmd_full
     - pythonの実行コマンドに現在のpythonのフルパスを指定
     - 未指定時にはpython launcherを使う
-    - --venv
-      - 対象ファイルと同じフォルダに.venvが存在する場合、そのpythonで起動する
+    - --env
+      - 対象ファイルがuvプロジェクト内にある場合、uv runで起動する
+      - uvプロジェクトでない場合、対象ファイルと同じフォルダに.venvがあれば、そのpythonで起動する
   - --arg_files
     - 1つ目の引数を対象のpythonファイルとし、2つ目以降をその引数としてbatを作成する
 '''
@@ -45,23 +46,34 @@ class PathMode(Enum):
 @dataclass
 class Cfg:
     py_cmd: str = ''
-    venv: bool = False
+    env: bool = False
     path_mode: PathMode = PathMode.CUR
     pause: bool = False
+
+def find_uv_project(py: Path):
+    return next(
+        (parent for parent in (py.parent, *py.parent.parents)
+         if (parent / 'uv.lock').is_file()),
+        None,
+    )
 
 def contents(py: Path, cfg: Cfg, args: list[str]):
     arg = ' '.join([f'"{s}"' for s in args])
 
     py_cmd = f'"{cfg.py_cmd}"'
-    if cfg.venv:
-        venv_python = (py.parent / '.venv' / 'Scripts' / 'python.exe').resolve()
-        if venv_python.is_file():
-            if cfg.path_mode == PathMode.CUR:
-                py_cmd = '.venv\\Scripts\\python.exe'
-            elif cfg.path_mode == PathMode.REL:
-                py_cmd = '%~dp0.venv\\Scripts\\python.exe'
-            elif cfg.path_mode == PathMode.ABS:
-                py_cmd = f'"{venv_python}"'
+    if cfg.env:
+        uv_project = find_uv_project(py)
+        if uv_project is not None:
+            py_cmd = f'uv run --project "{uv_project.resolve()}"'
+        else:
+            venv_python = (py.parent / '.venv' / 'Scripts' / 'python.exe').resolve()
+            if venv_python.is_file():
+                if cfg.path_mode == PathMode.CUR:
+                    py_cmd = '.venv\\Scripts\\python.exe'
+                elif cfg.path_mode == PathMode.REL:
+                    py_cmd = '%~dp0.venv\\Scripts\\python.exe'
+                elif cfg.path_mode == PathMode.ABS:
+                    py_cmd = f'"{venv_python}"'
 
     if cfg.path_mode == PathMode.REL:
         yield f'{py_cmd} "%~dp0{py.name}" {arg} %*'
@@ -99,7 +111,7 @@ def main():
         cfg.path_mode = PathMode.CUR
 
     cfg.pause = '--pause' in options
-    cfg.venv = '--venv' in options
+    cfg.env = '--env' in options
 
     arg_files = '--arg_files' in options
     make_self = '--self' in options
