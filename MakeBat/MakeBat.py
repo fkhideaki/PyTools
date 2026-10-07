@@ -50,21 +50,18 @@ class Cfg:
     path_mode: PathMode = PathMode.CUR
     pause: bool = False
 
-def find_uv_project(py: Path):
-    return next(
-        (parent for parent in (py.parent, *py.parent.parents)
-         if (parent / 'uv.lock').is_file()),
-        None,
-    )
+def is_uv_project(py: Path):
+    dir = py.parent
+    proj = dir / 'pyproject.toml'
+    return proj.is_file()
 
 def contents(py: Path, cfg: Cfg, args: list[str]):
     arg = ' '.join([f'"{s}"' for s in args])
 
     py_cmd = f'"{cfg.py_cmd}"'
     if cfg.env:
-        uv_project = find_uv_project(py)
-        if uv_project is not None:
-            py_cmd = f'uv run --project "{uv_project.resolve()}"'
+        if is_uv_project(py):
+            py_cmd = f'uv run'
         else:
             venv_python = (py.parent / '.venv' / 'Scripts' / 'python.exe').resolve()
             if venv_python.is_file():
