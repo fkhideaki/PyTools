@@ -7,7 +7,7 @@
 - pymupdf
 
 ## 使い方:
-py PdfToPng.py <入力PDFファイル> [出力先ディレクトリ] [--dpi DPI] [--rot ROT]
+py PdfToPng.py <入力PDFファイル> [出力先ディレクトリ] [--dpi DPI] [--rot ROT] [--transparent]
 
 ## 例
 - py pdf_rotate_to_png.py sample.pdf
@@ -22,7 +22,7 @@ from pathlib import Path
 import pymupdf
 
 
-def rotate_pdf_pages_to_png(pdf_path: str, output_dir: str, dpi: int, rot: int) -> list[str]:
+def rotate_pdf_pages_to_png(pdf_path: str, output_dir: str, dpi: int, rot: int, transparent: bool = False) -> list[str]:
     """
     PDFの各ページを90度時計回りに回転してPNGとして保存する。
 
@@ -56,7 +56,7 @@ def rotate_pdf_pages_to_png(pdf_path: str, output_dir: str, dpi: int, rot: int) 
         if rot:
             page.set_rotation((page.rotation + rot) % 360)
 
-        pix = page.get_pixmap(matrix=matrix)
+        pix = page.get_pixmap(matrix=matrix, alpha=transparent)
         out_path = out_dir / f"{pdf_file.stem}_page{i:03d}.png"
         pix.save(str(out_path))
         output_paths.append(str(out_path))
@@ -80,10 +80,13 @@ def main():
     parser.add_argument(
         "--rot", type=int, default=0, help="画像の回転(時計回り)"
     )
+    parser.add_argument(
+        "--transparent", action="store_true", help="背景を透明にして出力する"
+    )
     args = parser.parse_args()
 
     try:
-        outputs = rotate_pdf_pages_to_png(args.pdf_path, args.output_dir, args.dpi, args.rot)
+        outputs = rotate_pdf_pages_to_png(args.pdf_path, args.output_dir, args.dpi, args.rot, args.transparent)
         print(f"\n完了: {len(outputs)}枚のPNGを出力しました。")
     except Exception as e:
         print(f"エラー: {e}", file=sys.stderr)
