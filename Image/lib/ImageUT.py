@@ -79,8 +79,6 @@ class AlphaExpand:
             img = img.convert('RGBA')
         
         arr = np.array(img)
-        
-        # RGBとアルファに分離
         rgb = arr[:, :, :3]
         alpha = arr[:, :, 3]
 
@@ -88,7 +86,6 @@ class AlphaExpand:
         ext_a = cls._expand_by_dilation(alpha, cfg)
         ext_c = cls._expand_colors_with_alpha(rgb, alpha, ext_a)
 
-        # 結合
         result = np.dstack([ext_c, ext_a])
         return Image.fromarray(result.astype(np.uint8), 'RGBA')
 
