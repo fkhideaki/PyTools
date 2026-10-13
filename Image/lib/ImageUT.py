@@ -6,6 +6,115 @@ import numpy as np
 from scipy import ndimage
 
 
+@dataclass
+class TargetSize:
+    scale: float | None = None
+    width: int | None = None
+    height: int | None = None
+    max_len: int | None = None
+
+    def get_dst_size(self, img: Image):
+        scale = self.scale
+        width = self.width
+        height = self.height
+        max_len = self.max_len
+
+        orgW, orgH = img.size
+        if scale is not None:
+            newW = int(orgW * scale)
+            newH = int(orgH * scale)
+            return (newW, newH)
+        elif width is not None:
+            newW = width
+            newH = int(width * orgH / orgW)
+            return (newW, newH)
+        elif height is not None:
+            newH = height
+            newW = int(height * orgW / orgH)
+            return (newW, newH)
+        elif max_len is not None:
+            if orgW >= orgH:
+                newW = max_len
+                newH = int(max_len * orgH / orgW)
+            else:
+                newH = max_len
+                newW = int(max_len * orgW / orgH)
+            return (newW, newH)
+        return None
+
+
+@dataclass
+class ResizeCfg:
+    repeat: bool = False
+    separate_rgb: bool = False
+    target_size: TargetSize = field(default_factory=TargetSize)
+    resample = Image.Resampling.BILINEAR
+
+
+class ImageResizeExt:
+    '''画像リサイズの拡張ユーティリティ'''
+
+    @classmethod
+    def resize(cls, img: Image, cfg: ResizeCfg):
+        new_sz = cfg.target_size.get_dst_size(img)
+        if not new_sz:
+            return img
+
+        if cfg.separate_rgb and img.mode == 'RGBA':
+            buf_c, buf_a = cls._separate_alpha(img)
+            resized_c = cls._resize_buf(buf_c, cfg, new_sz)
+            resized_a = cls._resize_buf(buf_a, cfg, new_sz)
+
+            rr, rg, rb = resized_c.split()
+            return Image.merge("RGBA", (rr, rg, rb, resized_a))
+        else:
+            return cls._resize_buf(img, cfg, new_sz)
+
+    @classmethod
+    def _separate_alpha(cls, img):
+        r, g, b, a = img.split()
+        rgb = Image.merge("RGB", (r, g, b))
+        return rgb, a
+
+    @classmethod
+    def _resize_buf(cls, buf, cfg: ResizeCfg, new_sz):
+        if cfg.repeat:
+            return cls.repeat_sampling_resize(buf, new_sz, cfg.resample)
+        else:
+            return buf.resize(new_sz, cfg.resample)
+
+    @classmethod
+    def repeat_sampling_resize(cls, img, new_sz, sample):
+        arr = np.array(img)
+        
+        pad_size = 4
+        if arr.ndim == 2:
+            padded = np.pad(arr, pad_size, mode='wrap')
+            mode = 'L'
+        else:
+            padded = np.pad(arr, ((pad_size, pad_size), (pad_size, pad_size), (0, 0)), mode='wrap')
+            mode = img.mode
+        
+        padded_img = Image.fromarray(padded.astype(np.uint8), mode=mode)
+        
+        old_w, old_h = img.size
+        new_w, new_h = new_sz
+        
+        scale_x = new_w / old_w
+        scale_y = new_h / old_h
+        
+        sxw = int((old_w + 2 * pad_size) * scale_x)
+        sxh = int((old_h + 2 * pad_size) * scale_y)
+        intermediate_sz = (sxw, sxh)
+        resized_padded = padded_img.resize(intermediate_sz, sample)
+        
+        crop_l = int(pad_size * scale_x)
+        crop_t = int(pad_size * scale_y)
+        crop_r = crop_l + new_w
+        crop_b = crop_t + new_h
+        return resized_padded.crop((crop_l, crop_t, crop_r, crop_b))
+
+
 class Alphamap:
     '''アルファマップ関連機能'''
 
@@ -130,115 +239,6 @@ class AlphaExpand:
             result_rgb[:, :, i] = result_channel
         
         return result_rgb
-
-
-@dataclass
-class TargetSize:
-    scale: float | None = None
-    width: int | None = None
-    height: int | None = None
-    max_len: int | None = None
-
-    def get_dst_size(self, img: Image):
-        scale = self.scale
-        width = self.width
-        height = self.height
-        max_len = self.max_len
-
-        orgW, orgH = img.size
-        if scale is not None:
-            newW = int(orgW * scale)
-            newH = int(orgH * scale)
-            return (newW, newH)
-        elif width is not None:
-            newW = width
-            newH = int(width * orgH / orgW)
-            return (newW, newH)
-        elif height is not None:
-            newH = height
-            newW = int(height * orgW / orgH)
-            return (newW, newH)
-        elif max_len is not None:
-            if orgW >= orgH:
-                newW = max_len
-                newH = int(max_len * orgH / orgW)
-            else:
-                newH = max_len
-                newW = int(max_len * orgW / orgH)
-            return (newW, newH)
-        return None
-
-
-@dataclass
-class ResizeCfg:
-    repeat: bool = False
-    separate_rgb: bool = False
-    target_size: TargetSize = field(default_factory=TargetSize)
-    resample = Image.Resampling.BILINEAR
-
-
-class ImageResizeExt:
-    '''画像リサイズの拡張ユーティリティ'''
-
-    @classmethod
-    def resize(cls, img: Image, cfg: ResizeCfg):
-        new_sz = cfg.target_size.get_dst_size(img)
-        if not new_sz:
-            return img
-
-        if cfg.separate_rgb and img.mode == 'RGBA':
-            buf_c, buf_a = cls._separate_alpha(img)
-            resized_c = cls._resize_buf(buf_c, cfg, new_sz)
-            resized_a = cls._resize_buf(buf_a, cfg, new_sz)
-
-            rr, rg, rb = resized_c.split()
-            return Image.merge("RGBA", (rr, rg, rb, resized_a))
-        else:
-            return cls._resize_buf(img, cfg, new_sz)
-
-    @classmethod
-    def _separate_alpha(cls, img):
-        r, g, b, a = img.split()
-        rgb = Image.merge("RGB", (r, g, b))
-        return rgb, a
-
-    @classmethod
-    def _resize_buf(cls, buf, cfg: ResizeCfg, new_sz):
-        if cfg.repeat:
-            return cls.repeat_sampling_resize(buf, new_sz, cfg.resample)
-        else:
-            return buf.resize(new_sz, cfg.resample)
-
-    @classmethod
-    def repeat_sampling_resize(cls, img, new_sz, sample):
-        arr = np.array(img)
-        
-        pad_size = 4
-        if arr.ndim == 2:
-            padded = np.pad(arr, pad_size, mode='wrap')
-            mode = 'L'
-        else:
-            padded = np.pad(arr, ((pad_size, pad_size), (pad_size, pad_size), (0, 0)), mode='wrap')
-            mode = img.mode
-        
-        padded_img = Image.fromarray(padded.astype(np.uint8), mode=mode)
-        
-        old_w, old_h = img.size
-        new_w, new_h = new_sz
-        
-        scale_x = new_w / old_w
-        scale_y = new_h / old_h
-        
-        sxw = int((old_w + 2 * pad_size) * scale_x)
-        sxh = int((old_h + 2 * pad_size) * scale_y)
-        intermediate_sz = (sxw, sxh)
-        resized_padded = padded_img.resize(intermediate_sz, sample)
-        
-        crop_l = int(pad_size * scale_x)
-        crop_t = int(pad_size * scale_y)
-        crop_r = crop_l + new_w
-        crop_b = crop_t + new_h
-        return resized_padded.crop((crop_l, crop_t, crop_r, crop_b))
 
 
 class FilesOperator:
