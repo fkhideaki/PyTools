@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Self
-from PIL import Image
+from PIL import Image, ImageChops
 import numpy as np
 from scipy import ndimage
 
@@ -147,6 +147,60 @@ class Alphamap:
         ary_dst[:, :, 3] = ary_a[:, :, 0]
         img_dst = Image.fromarray(ary_dst)
         return img_dst
+
+
+class ImgRepeat:
+    @classmethod
+    def repeat2x(cls, img: Image) -> Image:
+        '''
+        - 指定された画像を長辺方向に2倍、短辺方向に出来るだけ正方形に近くなる回数リピートさせた画像を返す
+        - 例えば500x300が入力された場合、横方向に2倍、縦方向に3倍リピートさせた1000x900の画像を返す
+        - ただし、長辺 / 短辺 が2.0倍以上であれば長辺方向にはリピートしない
+        '''
+        w, h = img.size
+        repeat_long = 2
+        whr = w / h
+        if whr < (1.0 / 2.0) or whr > 2.0:
+            repeat_long = 1
+        if w > h:
+            repeat_w = repeat_long
+            repeat_h = (w * repeat_w) // h
+        else:
+            repeat_h = repeat_long
+            repeat_w = (h * repeat_h) // w
+        new_w = w * repeat_w
+        new_h = h * repeat_h
+        new_img = Image.new(img.mode, (new_w, new_h))
+        for i in range(repeat_w):
+            for j in range(repeat_h):
+                new_img.paste(img, (i * w, j * h))
+        return new_img
+
+    @classmethod
+    def make_halfstep_repeat(cls, img: Image, to_vert: bool) -> Image:
+        '''\
+        - 指定画像をハーフステップリピート画像の1リピート単位に変換する
+        - to_vert: Trueを指定すると縦に2倍にして半周期ずらす、Falseを指定すると横に
+        '''
+        w, h = img.size
+
+        if to_vert:
+            # 下段: 横方向に半周期ずらす(ImageChops.offset は端が回り込む)
+            shifted = ImageChops.offset(img, w // 2, 0)
+            out = Image.new(img.mode, (w, h * 2))
+            out.paste(img, (0, 0))
+            out.paste(shifted, (0, h))
+        else:
+            # 右段: 縦方向に半周期ずらす
+            shifted = ImageChops.offset(img, 0, h // 2)
+            out = Image.new(img.mode, (w * 2, h))
+            out.paste(img, (0, 0))
+            out.paste(shifted, (w, 0))
+
+        # パレット画像などの情報を引き継ぐ
+        if img.mode == "P" and img.getpalette():
+            out.putpalette(img.getpalette())
+        return out
 
 
 @dataclass
