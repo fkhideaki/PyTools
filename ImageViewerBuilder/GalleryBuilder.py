@@ -7,8 +7,6 @@
 ## 使用方法
 - python GalleryBuilder.py <フォルダパス> [options]
 - options:
-  - --wheel
-    - 拡大画面をホイールでページ送りする機能を有効にする
   - --swipe
     - スマホ時にswipeでページ送りする機能を有効にする
 
@@ -24,14 +22,12 @@ from typing import List
 @dataclass
 class Cfg:
     swipe: bool = False
-    wheel: bool = False
     zip_file: str = ''
 
 def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
     folder_name = folder_path.name
     title = f'{folder_name}'
 
-    enableWheel = 'true' if cfg.wheel else 'false'
     enableSwipe = 'true' if cfg.swipe else 'false'
 
     html_template = f"""\
@@ -339,8 +335,56 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
         const images = {images_json};
     </script>
 
+    <!-- モーダル -->
+    <div id="modal" class="modal" onclick="closeModal()">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <div class="nav-zone prev" onclick="event.stopPropagation(); prevImage()">
+            <div class="nav-zone-arrow">&lt;</div>
+        </div>
+        <div class="nav-zone next" onclick="event.stopPropagation(); nextImage()">
+            <div class="nav-zone-arrow">&gt;</div>
+        </div>
+        <div class="modal-content" id="modal-content">
+            <img id="modal-img" src="" alt="" draggable="false">
+        </div>
+        <div class="modal-filename" id="modal-filename"></div>
+    </div>
+
     <script>
         let currentIndex = 0;
+
+        // ---- 拡大縮小の状態 ----
+        const ZOOM_MIN = 0.25;
+        const ZOOM_MAX = 16;
+        const zoom = {{ scale: 1, x: 0, y: 0 }};
+
+        function applyZoom() {{
+            const mc = document.getElementById('modal-content');
+            mc.style.transform =
+                'translate(' + zoom.x + 'px, ' + zoom.y + 'px) scale(' + zoom.scale + ')';
+            mc.style.cursor = (zoom.scale !== 1) ? 'grab' : '';
+        }}
+
+        function resetZoom() {{
+            zoom.scale = 1;
+            zoom.x = 0;
+            zoom.y = 0;
+            applyZoom();
+        }}
+
+        // 画面座標(clientX, clientY)を基準に倍率を変更
+        function zoomAt(clientX, clientY, factor) {{
+            const modal = document.getElementById('modal');
+            const newScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom.scale * factor));
+            if (newScale === zoom.scale) return;
+            const ratio = newScale / zoom.scale;
+            const cx = clientX - modal.clientWidth / 2;
+            const cy = clientY - modal.clientHeight / 2;
+            zoom.x = cx - ratio * (cx - zoom.x);
+            zoom.y = cy - ratio * (cy - zoom.y);
+            zoom.scale = newScale;
+            applyZoom();
+        }}
 
         function showImage(index) {{
             const modalImg = document.getElementById('modal-img');
@@ -351,6 +395,7 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
             modalImg.alt = fn;
             const numImg = images.length;
             modalFilename.textContent = cap + " (" + (index + 1) + "/" + numImg + ")";
+            resetZoom();
         }}
         
         function getIdx(filename) {{
@@ -384,11 +429,14 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
             const modal = document.getElementById('modal');
             modal.classList.remove('active');
         }}
+
+        function isModalActive() {{
+            return document.getElementById('modal').classList.contains('active');
+        }}
         
-        // ESCキーでモーダルを閉じる、矢印キーで画像切り替え
+        // ESCキーでモーダルを閉じる、矢印キーで画像切り替え、+/-/0で拡大縮小
         document.addEventListener('keydown', function(e) {{
-            const modal = document.getElementById('modal');
-            if (!modal.classList.contains('active')) return;
+            if (!isModalActive()) return;
             
             if (e.key === 'Escape') {{
                 closeModal();
@@ -396,24 +444,98 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
                 nextImage();
             }} else if (e.key === 'ArrowLeft') {{
                 prevImage();
+            }} else if (e.key === '+' || e.key === '=') {{
+                const m = document.getElementById('modal');
+                zoomAt(m.clientWidth / 2, m.clientHeight / 2, 1.25);
+            }} else if (e.key === '-') {{
+                const m = document.getElementById('modal');
+                zoomAt(m.clientWidth / 2, m.clientHeight / 2, 1 / 1.25);
+            }} else if (e.key === '0') {{
+                resetZoom();
             }}
         }});
 
-        let enableWheel = {enableWheel};
-        let enableSwipe = {enableSwipe};
+        // マウスホイール: モーダル表示中は背景をスクロールさせず、画像を拡大縮小する
+        document.addEventListener('wheel', function(e) {{
+            if (!isModalActive()) return;
+            e.preventDefault();
 
-        document.addEventListener('mousewheel', function(e) {{
-            if (!enableWheel) return;
+            let delta = e.deltaY;
+            if (e.deltaMode === 1) delta *= 16;        // 行単位
+            else if (e.deltaMode === 2) delta *= 100;  // ページ単位
+            const factor = Math.exp(-delta * 0.0015);
+            zoomAt(e.clientX, e.clientY, factor);
+        }}, {{ passive: false }});
 
+        // 拡大中はドラッグで画像を移動
+        let dragging = false;
+        let dragMoved = false;
+        let suppressClick = false;
+        let dragLastX = 0;
+        let dragLastY = 0;
+        let dragStartX = 0;
+        let dragStartY = 0;
+
+        document.getElementById('modal-content').addEventListener('mousedown', function(e) {{
+            if (e.button !== 0 || zoom.scale === 1) return;
+            dragging = true;
+            dragMoved = false;
+            dragLastX = dragStartX = e.clientX;
+            dragLastY = dragStartY = e.clientY;
+            this.style.cursor = 'grabbing';
+        }});
+
+        window.addEventListener('mousemove', function(e) {{
+            if (!dragging) return;
+            if (Math.abs(e.clientX - dragStartX) > 3 || Math.abs(e.clientY - dragStartY) > 3) {{
+                dragMoved = true;
+            }}
+            zoom.x += e.clientX - dragLastX;
+            zoom.y += e.clientY - dragLastY;
+            dragLastX = e.clientX;
+            dragLastY = e.clientY;
+            applyZoom();
+        }});
+
+        window.addEventListener('mouseup', function() {{
+            if (!dragging) return;
+            dragging = false;
+            if (dragMoved) {{
+                // ドラッグ直後のclickでモーダルが閉じないようにする
+                suppressClick = true;
+                setTimeout(function() {{ suppressClick = false; }}, 0);
+            }}
+            applyZoom();
+        }});
+
+        // 選択状態になるのを防ぐ（高速クリック・ダブルクリック対策）
+        (function() {{
             const modal = document.getElementById('modal');
-            if (!modal.classList.contains('active')) return;
+            // クリック開始時の選択・ドラッグ開始を抑止
+            modal.addEventListener('mousedown', function(e) {{
+                if (e.detail > 1 || true) e.preventDefault();
+            }});
+            modal.addEventListener('dblclick', function(e) {{
+                e.preventDefault();
+            }});
+            modal.addEventListener('dragstart', function(e) {{
+                e.preventDefault();
+            }});
+            // ドラッグ直後のclickを無効化（キャプチャ段階で止める）
+            modal.addEventListener('click', function(e) {{
+                if (suppressClick) {{
+                    e.stopPropagation();
+                    e.preventDefault();
+                    suppressClick = false;
+                }}
+            }}, true);
+        }})();
 
-            if (e.deltaY < 0) {{
-                prevImage();
-            }} else if (e.deltaY > 0) {{
-                nextImage();
-            }}
+        document.addEventListener('selectstart', function(e) {{
+            if (isModalActive()) e.preventDefault();
         }});
+
+        let enableSwipe = {enableSwipe};
 
         // タッチスワイプイベント
         let touchStartX = 0;
@@ -431,14 +553,12 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
         }}
         
         document.addEventListener('touchstart', function(e) {{
-            const modal = document.getElementById('modal');
-            if (!modal.classList.contains('active')) return;
+            if (!isModalActive()) return;
             touchStartX = e.changedTouches[0].screenX;
         }});
         
         document.addEventListener('touchend', function(e) {{
-            const modal = document.getElementById('modal');
-            if (!modal.classList.contains('active')) return;
+            if (!isModalActive()) return;
             touchEndX = e.changedTouches[0].screenX;
             handleSwipe();
         }});
@@ -476,24 +596,6 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
 
         makeGallery();
     </script>
-"""
-
-    html_template += f"""\
-    
-    <!-- モーダル -->
-    <div id="modal" class="modal" onclick="closeModal()">
-        <span class="close" onclick="closeModal()">&times;</span>
-        <div class="nav-zone prev" onclick="event.stopPropagation(); prevImage()">
-            <div class="nav-zone-arrow">&lt;</div>
-        </div>
-        <div class="nav-zone next" onclick="event.stopPropagation(); nextImage()">
-            <div class="nav-zone-arrow">&gt;</div>
-        </div>
-        <div class="modal-content">
-            <img id="modal-img" src="" alt="">
-        </div>
-        <div class="modal-filename" id="modal-filename"></div>
-    </div>
 """
 
     html_template += f"""\
@@ -541,7 +643,6 @@ def buildMain(folder: Path, opt: List[str]):
         return
 
     cfg = Cfg()
-    cfg.wheel = '--wheel' in opt
     cfg.swipe = '--swipe' in opt
     cfg.zip_file = get_zip(folder)
     html = generatePage(folder, images, cfg)
