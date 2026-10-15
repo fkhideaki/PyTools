@@ -107,6 +107,8 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             transition: transform 0.2s, box-shadow 0.2s;
             cursor: pointer;
+            -webkit-user-select: none;
+            user-select: none;
         }}
         
         .image-container:hover {{
@@ -158,6 +160,13 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
             justify-content: center;
             visibility: hidden;
             opacity: 0;
+            overflow: hidden;
+            overscroll-behavior: contain;
+            touch-action: none;
+            /* 高速クリックなどによる選択状態を防ぐ */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }}
         
         .modal.active {{
@@ -179,6 +188,8 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
             background-color: #ccc;
             background-size: 30px 30px;
             background-position: 0 0, 15px 15px;
+            transform-origin: center center;
+            will-change: transform;
         }}
         
         .modal-content img {{
@@ -186,6 +197,9 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
             max-height: 90vh;
             object-fit: contain;
             display: block;
+            -webkit-user-drag: none;
+            user-select: none;
+            pointer-events: auto;
         }}
         
         .close {{
