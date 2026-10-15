@@ -508,6 +508,97 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
             applyZoom();
         }});
 
+        // タッチ操作: 2本指ピンチで拡大縮小（中点の移動でパンも可）、拡大中は1本指でパン
+        (function() {{
+            const modal = document.getElementById('modal');
+            let lastDist = 0, lastX = 0, lastY = 0;
+            let startX = 0, startY = 0;
+            let touchMoved = false;
+
+            function info(touches) {{
+                if (touches.length >= 2) {{
+                    const a = touches[0], b = touches[1];
+                    return {{
+                        n: 2,
+                        dist: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY),
+                        x: (a.clientX + b.clientX) / 2,
+                        y: (a.clientY + b.clientY) / 2
+                    }};
+                }}
+                return {{ n: 1, dist: 0, x: touches[0].clientX, y: touches[0].clientY }};
+            }}
+
+            modal.addEventListener('touchstart', function(e) {{
+                if (!isModalActive() || e.touches.length === 0) return;
+                const i = info(e.touches);
+                lastDist = i.dist;
+                lastX = i.x;
+                lastY = i.y;
+                if (e.touches.length === 1) {{
+                    startX = i.x;
+                    startY = i.y;
+                    touchMoved = false;
+                }} else {{
+                    touchMoved = true; // 複数指の操作ではタップ扱いにしない
+                }}
+            }}, {{ passive: false }});
+
+            modal.addEventListener('touchmove', function(e) {{
+                if (!isModalActive() || e.touches.length === 0) return;
+                const i = info(e.touches);
+                if (i.n >= 2) {{
+                    e.preventDefault();
+                    touchMoved = true;
+                    zoom.x += i.x - lastX;
+                    zoom.y += i.y - lastY;
+                    if (lastDist > 0 && i.dist > 0) {{
+                        zoomAt(i.x, i.y, i.dist / lastDist);
+                    }}
+                    applyZoom();
+                    lastDist = i.dist;
+                }} else if (zoom.scale !== 1) {{
+                    e.preventDefault();
+                    if (Math.abs(i.x - startX) > 3 || Math.abs(i.y - startY) > 3) {{
+                        touchMoved = true;
+                    }}
+                    zoom.x += i.x - lastX;
+                    zoom.y += i.y - lastY;
+                    applyZoom();
+                }}
+                lastX = i.x;
+                lastY = i.y;
+            }}, {{ passive: false }});
+
+            modal.addEventListener('touchend', function(e) {{
+                if (!isModalActive()) return;
+                if (e.touches.length > 0) {{
+                    // 指が1本残った場合: 位置が飛ばないよう基準を更新
+                    const i = info(e.touches);
+                    lastDist = i.dist;
+                    lastX = i.x;
+                    lastY = i.y;
+                    touchMoved = true;
+                    return;
+                }}
+                if (touchMoved) {{
+                    // ピンチ/パンの後にclickでモーダルが閉じたり画像が切り替わらないようにする
+                    if (e.cancelable) e.preventDefault();
+                    suppressClick = true;
+                    setTimeout(function() {{ suppressClick = false; }}, 350);
+                }}
+                touchMoved = false;
+            }}, {{ passive: false }});
+
+            modal.addEventListener('touchcancel', function() {{
+                touchMoved = false;
+            }});
+
+            // iOS Safari のページ全体ピンチズームを抑止
+            ['gesturestart', 'gesturechange', 'gestureend'].forEach(function(name) {{
+                modal.addEventListener(name, function(e) {{ e.preventDefault(); }});
+            }});
+        }})();
+
         // 選択状態になるのを防ぐ（高速クリック・ダブルクリック対策）
         (function() {{
             const modal = document.getElementById('modal');
