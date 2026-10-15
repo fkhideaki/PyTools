@@ -228,13 +228,11 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
             color: #fff;
             font-size: 30px;
             font-weight: bold;
-            background: rgba(200,200,200,0.25);
-            width: 45px;
-            height: 45px;
+            width: 30px;
+            height: 30px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 22px;
             opacity: 0;
             transition: opacity 0.2s;
             user-select: none;
@@ -472,10 +470,10 @@ def generatePage(folder_path: Path, images: list[str], cfg: Cfg):
     <div id="modal" class="modal" onclick="closeModal()">
         <span class="close" onclick="closeModal()">&times;</span>
         <div class="nav-zone prev" onclick="event.stopPropagation(); prevImage()">
-            <div class="nav-zone-arrow">＜</div>
+            <div class="nav-zone-arrow">&lt;</div>
         </div>
         <div class="nav-zone next" onclick="event.stopPropagation(); nextImage()">
-            <div class="nav-zone-arrow">＞</div>
+            <div class="nav-zone-arrow">&gt;</div>
         </div>
         <div class="modal-content">
             <img id="modal-img" src="" alt="">
