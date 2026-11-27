@@ -5,17 +5,17 @@
 特定のパターンに基づいて文字列を生成するスクリプト。
 
 ## 使い方
-1. `pattern` 変数に生成したい文字列のパターン。プレースホルダー `$0`, `$1`, `$2` を使用可。
-2. `words0`, `words1`, `words2` リストにそれぞれのプレースホルダーに対応する文字列のリスト。
+1. `pattern` 変数に生成したい文字列のパターン。プレースホルダー `$1`, `$2`, `$3` を使用可。
+2. `words1`, `words2`, `words3` リストにそれぞれのプレースホルダーに対応する文字列のリスト。
 3. スクリプトを実行すると、指定したパターンに基づいて全ての組み合わせの文字列が生成され、出力される。
 
 ## GUI
 - Pattern 欄にパターンを入力する。
-- $0 / $1 / $2 の各欄に、1行につき1単語を入力する（空行は無視される）。
+- $1 / $2 / $3 の各欄に、1行につき1単語を入力する（空行は無視される）。
 - Generate ボタンで結果欄に全組み合わせが出力される。
 - 「同一インデックスで組み合わせる」をオンにすると総当たりではなく、
   各欄の同じ行どうしを組み合わせる（足りない欄は空文字扱い）。
-  例: Pattern=$0_$1, $0=[1,2], $1=[a,b,c] → 1_a, 2_b, _c
+  例: Pattern=$1_$2, $1=[1,2], $2=[a,b,c] → 1_a, 2_b, _c
 '''
 
 from dataclasses import dataclass
@@ -26,45 +26,45 @@ from tkinter import ttk
 @dataclass
 class PatternGenerator:
     pattern: str
-    words0: list
     words1: list
     words2: list
+    words3: list
 
     def gen_words(self):
-        for w0 in self.words0 or ['']:
-            t0 = self.pattern.replace('$0', w0)
-            for w1 in self.words1 or ['']:
-                t1 = t0.replace('$1', w1)
-                for w2 in self.words2 or ['']:
-                    t2 = t1.replace('$2', w2)
-                    yield t2
+        for w1 in self.words1 or ['']:
+            t1 = self.pattern.replace('$1', w1)
+            for w2 in self.words2 or ['']:
+                t2 = t1.replace('$2', w2)
+                for w3 in self.words3 or ['']:
+                    t3 = t2.replace('$3', w3)
+                    yield t3
 
     def gen_words_by_index(self):
         '''各リストの同一インデックスの単語を組み合わせて生成する。
         最も長いリストの件数分を生成し、足りないリストは空文字で埋める。'''
-        lists = (self.words0, self.words1, self.words2)
+        lists = (self.words1, self.words2, self.words3)
         count = max(len(w) for w in lists)
         for i in range(count):
-            w0, w1, w2 = (w[i] if i < len(w) else '' for w in lists)
-            yield self.pattern.replace('$0', w0).replace('$1', w1).replace('$2', w2)
+            w1, w2, w3 = (w[i] if i < len(w) else '' for w in lists)
+            yield self.pattern.replace('$1', w1).replace('$2', w2).replace('$3', w3)
 
 
 def start_implement():
-    pattern = 'file_$0$1.txt'
+    pattern = 'file_$1$2.txt'
 
-    words0 = [
+    words1 = [
         'a',
         'b',
         'c'
     ]
-    words1 = [
+    words2 = [
         '0',
         '1'
     ]
-    words2 = [
+    words3 = [
     ]
 
-    generator = PatternGenerator(pattern, words0, words1, words2)
+    generator = PatternGenerator(pattern, words1, words2, words3)
     for s in generator.gen_words():
         print(s)
 
@@ -134,10 +134,10 @@ def start_gui():
     ttk.Label(main, text="各欄に 1行1単語 で入力してください（空行は無視されます）").grid(
         row=1, column=0, columnspan=3, sticky=tk.W, pady=(0, 4))
 
-    # --- Words ($0, $1, $2) ---
+    # --- Words ($1, $2, $3) ---
     words_texts = []
     for i in range(3):
-        frame = ttk.LabelFrame(main, text=f"Words for ${i}", padding=4)
+        frame = ttk.LabelFrame(main, text=f"Words for ${i + 1}", padding=4)
         frame.grid(row=2, column=i, sticky=tk.NSEW, padx=(0 if i == 0 else 4, 0 if i == 2 else 4))
         words_texts.append(_make_scrolled_text(frame, height=10, width=22))
 
@@ -150,9 +150,9 @@ def start_gui():
 
     def generate():
         pattern = pattern_entry.get()
-        words0, words1, words2 = (_get_lines(t) for t in words_texts)
+        words1, words2, words3 = (_get_lines(t) for t in words_texts)
 
-        generator = PatternGenerator(pattern, words0, words1, words2)
+        generator = PatternGenerator(pattern, words1, words2, words3)
         if by_index_var.get():
             results = list(generator.gen_words_by_index())
         else:
