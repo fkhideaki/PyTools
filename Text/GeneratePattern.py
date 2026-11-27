@@ -16,6 +16,7 @@
 - 「同一インデックスで組み合わせる」をオンにすると総当たりではなく、
   各欄の同じ行どうしを組み合わせる（足りない欄は空文字扱い）。
   例: Pattern=$1_$2, $1=[1,2], $2=[a,b,c] → 1_a, 2_b, _c
+- キー操作: F5 = 生成実行 / Esc = アプリ終了 / Tab, Shift+Tab = フォーカス移動
 '''
 
 from dataclasses import dataclass
@@ -166,9 +167,9 @@ def start_gui():
         root.clipboard_append(output_text.get('1.0', 'end-1c'))
         status_var.set("結果をクリップボードにコピーしました")
 
-    ttk.Checkbutton(button_frame, text="同一インデックスで組み合わせる",
+    ttk.Checkbutton(button_frame, text="同一インデックスで組み合わせる（総当たりしない）",
                     variable=by_index_var).grid(row=0, column=0, padx=(0, 12))
-    ttk.Button(button_frame, text="Generate", command=generate).grid(row=0, column=1, padx=4)
+    ttk.Button(button_frame, text="Generate (F5)", command=generate).grid(row=0, column=1, padx=4)
     ttk.Button(button_frame, text="Copy", command=copy_output).grid(row=0, column=2, padx=4)
     ttk.Label(button_frame, textvariable=status_var).grid(row=0, column=3, padx=(12, 0))
 
@@ -176,6 +177,10 @@ def start_gui():
     output_frame = ttk.LabelFrame(main, text="Result", padding=4)
     output_frame.grid(row=4, column=0, columnspan=3, sticky=tk.NSEW)
     output_text = _make_scrolled_text(output_frame, height=20, width=90)
+
+    # --- ショートカットキー（どのコントロールにフォーカスがあっても有効） ---
+    root.bind('<F5>', lambda event: generate())
+    root.bind('<Escape>', lambda event: root.destroy())
 
     # 初期サイズで全パーツが収まるようにし、それ以下には縮まないようにする
     root.update_idletasks()
