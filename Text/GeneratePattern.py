@@ -13,6 +13,9 @@
 - Pattern 欄にパターンを入力する。
 - $0 / $1 / $2 の各欄に、1行につき1単語を入力する（空行は無視される）。
 - Generate ボタンで結果欄に全組み合わせが出力される。
+- 「同一インデックスで組み合わせる」をオンにすると総当たりではなく、
+  各欄の同じ行どうしを組み合わせる（足りない欄は空文字扱い）。
+  例: Pattern=$0_$1, $0=[1,2], $1=[a,b,c] → 1_a, 2_b, _c
 '''
 
 from dataclasses import dataclass
@@ -35,6 +38,15 @@ class PatternGenerator:
                 for w2 in self.words2 or ['']:
                     t2 = t1.replace('$2', w2)
                     yield t2
+
+    def gen_words_by_index(self):
+        '''各リストの同一インデックスの単語を組み合わせて生成する。
+        最も長いリストの件数分を生成し、足りないリストは空文字で埋める。'''
+        lists = (self.words0, self.words1, self.words2)
+        count = max(len(w) for w in lists)
+        for i in range(count):
+            w0, w1, w2 = (w[i] if i < len(w) else '' for w in lists)
+            yield self.pattern.replace('$0', w0).replace('$1', w1).replace('$2', w2)
 
 
 def start_implement():
@@ -114,13 +126,17 @@ def start_gui():
     button_frame.grid(row=3, column=0, columnspan=3, pady=8)
 
     status_var = tk.StringVar(value="")
+    by_index_var = tk.BooleanVar(value=False)
 
     def generate():
         pattern = pattern_entry.get()
         words0, words1, words2 = (_get_lines(t) for t in words_texts)
 
         generator = PatternGenerator(pattern, words0, words1, words2)
-        results = list(generator.gen_words())
+        if by_index_var.get():
+            results = list(generator.gen_words_by_index())
+        else:
+            results = list(generator.gen_words())
         output_text.delete('1.0', tk.END)
         output_text.insert(tk.END, '\n'.join(results))
         status_var.set(f"{len(results)} 件生成しました")
@@ -130,9 +146,11 @@ def start_gui():
         root.clipboard_append(output_text.get('1.0', 'end-1c'))
         status_var.set("結果をクリップボードにコピーしました")
 
-    ttk.Button(button_frame, text="Generate", command=generate).grid(row=0, column=0, padx=4)
-    ttk.Button(button_frame, text="Copy", command=copy_output).grid(row=0, column=1, padx=4)
-    ttk.Label(button_frame, textvariable=status_var).grid(row=0, column=2, padx=(12, 0))
+    ttk.Checkbutton(button_frame, text="同一インデックスで組み合わせる（総当たりしない）",
+                    variable=by_index_var).grid(row=0, column=0, padx=(0, 12))
+    ttk.Button(button_frame, text="Generate", command=generate).grid(row=0, column=1, padx=4)
+    ttk.Button(button_frame, text="Copy", command=copy_output).grid(row=0, column=2, padx=4)
+    ttk.Label(button_frame, textvariable=status_var).grid(row=0, column=3, padx=(12, 0))
 
     # --- Output ---
     output_frame = ttk.LabelFrame(main, text="Result", padding=4)
