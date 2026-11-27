@@ -75,12 +75,32 @@ def _make_scrolled_text(parent, height, width):
     parent.rowconfigure(0, weight=1)
     text = tk.Text(parent, height=height, width=width, wrap=tk.NONE, undo=True)
     text.grid(row=0, column=0, sticky=tk.NSEW)
-    yscroll = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=text.yview)
+    yscroll = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=text.yview, takefocus=False)
     yscroll.grid(row=0, column=1, sticky=tk.NS)
-    xscroll = ttk.Scrollbar(parent, orient=tk.HORIZONTAL, command=text.xview)
+    xscroll = ttk.Scrollbar(parent, orient=tk.HORIZONTAL, command=text.xview, takefocus=False)
     xscroll.grid(row=1, column=0, sticky=tk.EW)
     text.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
+    _bind_focus_traversal(text)
     return text
+
+
+def _bind_focus_traversal(widget):
+    '''Tab / Shift+Tab で文字を入力せず、コントロール間のフォーカス移動にする。'''
+    def focus_next(event):
+        event.widget.tk_focusNext().focus_set()
+        return 'break'
+
+    def focus_prev(event):
+        event.widget.tk_focusPrev().focus_set()
+        return 'break'
+
+    widget.bind('<Tab>', focus_next)
+    widget.bind('<Shift-Tab>', focus_prev)
+    try:
+        # Linux(X11) では Shift+Tab が ISO_Left_Tab として届く
+        widget.bind('<ISO_Left_Tab>', focus_prev)
+    except tk.TclError:
+        pass
 
 
 def _get_lines(text_widget):
