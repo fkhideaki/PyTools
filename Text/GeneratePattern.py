@@ -166,7 +166,7 @@ def start_gui():
         root.clipboard_append(output_text.get('1.0', 'end-1c'))
         status_var.set("結果をクリップボードにコピーしました")
 
-    ttk.Checkbutton(button_frame, text="同一インデックスで組み合わせる（総当たりしない）",
+    ttk.Checkbutton(button_frame, text="同一インデックスで組み合わせる",
                     variable=by_index_var).grid(row=0, column=0, padx=(0, 12))
     ttk.Button(button_frame, text="Generate", command=generate).grid(row=0, column=1, padx=4)
     ttk.Button(button_frame, text="Copy", command=copy_output).grid(row=0, column=2, padx=4)
